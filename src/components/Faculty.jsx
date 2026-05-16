@@ -18,7 +18,7 @@ const Faculty = () => {
           </motion.div>
         </div>
 
-        <div className="max-w-sm mx-auto">
+        <div className="grid gap-8 max-w-5xl mx-auto sm:grid-cols-2">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -36,10 +36,34 @@ const Faculty = () => {
             </div>
             <h4 className="text-2xl font-bold text-gray-900 mb-2">ADIL MALAPURAM</h4>
             <div className="inline-block px-4 py-1.5 rounded-full bg-blue-50 text-blue-600 font-medium text-sm mb-4">
-              Expert Instructor
+              Founder
             </div>
             <p className="text-gray-600 text-sm leading-relaxed">
               Dedicated to empowering students with exceptional guidance and personalized attention to help them achieve their highest potential.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="glass-panel p-6 rounded-3xl text-center group hover:-translate-y-2 transition-all duration-300"
+          >
+            <div className="relative w-48 h-48 mx-auto mb-6 rounded-full overflow-hidden border-4 border-white shadow-xl group-hover:scale-105 transition-transform duration-300">
+              <img 
+                src="/cofounder.jpg" 
+                alt="Ismail Chelembra" 
+                className="w-full h-full object-cover"
+                onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/400x400/0b3b60/ffffff?text=Ismail+Chelembra" }}
+              />
+            </div>
+            <h4 className="text-2xl font-bold text-gray-900 mb-2">ISMAIL CHELEMBRA</h4>
+            <div className="inline-block px-4 py-1.5 rounded-full bg-blue-50 text-blue-600 font-medium text-sm mb-4">
+              Co-Founder
+            </div>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              Building strong leadership with vision and experience to support growth, innovation, and long-term success.
             </p>
           </motion.div>
         </div>
