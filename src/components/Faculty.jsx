@@ -14,7 +14,7 @@ const Faculty = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Founder</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">FOUNDERS</h2>
           </motion.div>
         </div>
 
