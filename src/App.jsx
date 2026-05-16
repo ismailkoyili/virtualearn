@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import Navbar from './components/Navbar';
-import Hero from './components/Hero';
-import About from './components/About';
-import Courses from './components/Courses';
-import Features from './components/Features';
-import WhyChooseUs from './components/WhyChooseUs';
-import Testimonials from './components/Testimonials';
-import Faculty from './components/Faculty';
-import Contact from './components/Contact';
-import Footer from './components/Footer';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Dashboard from './pages/Dashboard';
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -43,20 +39,16 @@ function App() {
         )}
       </AnimatePresence>
 
-      <div className="min-h-screen bg-brand-light font-sans text-brand-dark overflow-x-hidden">
-        <Navbar />
-        <main>
-          <Hero />
-          <About />
-          <Courses />
-          <Features />
-          <WhyChooseUs />
-          <Testimonials />
-          <Faculty />
-          <Contact />
-        </main>
-        <Footer />
-      </div>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+          </Routes>
+        </Router>
+      </AuthProvider>
     </>
   );
 }

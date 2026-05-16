@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -47,12 +51,42 @@ const Navbar = () => {
                 {link.name}
               </a>
             ))}
-            <a
-              href="#contact"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-medium transition-colors shadow-lg shadow-blue-500/30"
-            >
-              Join Now
-            </a>
+            <div className="flex items-center space-x-4 ml-4">
+              {user ? (
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={() => {
+                      logout();
+                      navigate('/');
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-medium transition-colors shadow-lg shadow-blue-500/30"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                  >
+                    Student Portal
+                  </Link>
+                  <a
+                    href="#contact"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-medium transition-colors shadow-lg shadow-blue-500/30"
+                  >
+                    Join Now
+                  </a>
+                </>
+              )}
+            </div>
           </nav>
 
           {/* Mobile Navigation Toggle */}
@@ -86,13 +120,46 @@ const Navbar = () => {
                 {link.name}
               </a>
             ))}
-            <a
-              href="#contact"
-              className="block w-full text-center mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors"
-              onClick={() => setIsOpen(false)}
-            >
-              Join Now
-            </a>
+            <div className="pt-4 pb-2 border-t border-gray-100 flex flex-col gap-3">
+              {user ? (
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="block w-full text-center text-blue-600 border border-blue-600 hover:bg-blue-50 px-6 py-3 rounded-full font-medium transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsOpen(false);
+                      navigate('/');
+                    }}
+                    className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="block w-full text-center text-blue-600 border border-blue-600 hover:bg-blue-50 px-6 py-3 rounded-full font-medium transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Student Portal
+                  </Link>
+                  <a
+                    href="#contact"
+                    className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Join Now
+                  </a>
+                </>
+              )}
+            </div>
           </div>
         </motion.div>
       )}
