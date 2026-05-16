@@ -27,7 +27,7 @@ const Footer = () => {
               <a href="https://www.instagram.com/learnvirtu?igsh=bnBtMnI4eDdmaDQ=" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-blue-600 hover:text-white transition-all">
                 <Instagram size={20} />
               </a>
-              <a href="https://wa.me/971505912360" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-green-500 hover:text-white transition-all">
+              <a href="https://wa.me/917034313208" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:bg-green-500 hover:text-white transition-all">
                 <Phone size={20} />
               </a>
             </div>
@@ -60,7 +60,7 @@ const Footer = () => {
             <ul className="space-y-4">
               <li className="flex items-start gap-3">
                 <Phone size={20} className="text-blue-500 flex-shrink-0 mt-1" />
-                <span className="text-gray-400">+971 50 591 2360</span>
+                <span className="text-gray-400">+917034313208</span>
               </li>
               <li className="flex items-start gap-3">
                 <Mail size={20} className="text-blue-500 flex-shrink-0 mt-1" />

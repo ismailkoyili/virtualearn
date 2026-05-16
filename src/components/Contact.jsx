@@ -61,16 +61,16 @@ const Contact = () => {
           <ContactInfoCard 
             icon={Phone} 
             title="Call Us Directly" 
-            content="+971 50 591 2360" 
-            href="tel:+971505912360"
+            content="+917034313208" 
+            href="tel:+917034313208"
             colorClass="bg-blue-600"
             delay={0.1} 
           />
           <ContactInfoCard 
             icon={MessageCircle} 
             title="Chat on WhatsApp" 
-            content="+971 50 591 2360" 
-            href="https://wa.me/971505912360"
+            content="+917034313208" 
+            href="https://wa.me/917034313208"
             colorClass="bg-[#25D366]"
             delay={0.2} 
           />
