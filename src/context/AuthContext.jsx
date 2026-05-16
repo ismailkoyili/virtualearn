@@ -6,7 +6,8 @@ import {
   onAuthStateChanged,
   updateProfile
 } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -50,6 +51,19 @@ export const AuthProvider = ({ children }) => {
         name: name,
         email: userCredential.user.email,
       });
+
+      // Save user to Firestore 'users' collection
+      try {
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          uid: userCredential.user.uid,
+          name: name,
+          email: userCredential.user.email,
+          createdAt: new Date().toISOString()
+        });
+      } catch (firestoreError) {
+        console.error("Error saving user to Firestore:", firestoreError);
+        // We don't fail the signup if this fails, but it means they won't appear in chat list
+      }
 
       return userCredential.user;
     } catch (error) {

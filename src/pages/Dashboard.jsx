@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, User, CheckCircle, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { LogOut, User, CheckCircle, Calendar, Clock, AlertCircle, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
@@ -108,6 +108,13 @@ const Dashboard = () => {
             <span className="font-bold text-xl text-gray-800 ml-2 hidden sm:block">Student Portal</span>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/chat')}
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors px-4 py-2 rounded-full font-medium"
+            >
+              <MessageSquare size={18} />
+              <span className="hidden sm:block">Messages</span>
+            </button>
             <div className="flex items-center gap-2 text-gray-700">
               <div className="bg-blue-100 p-2 rounded-full text-blue-600">
                 <User size={18} />
