@@ -91,6 +91,12 @@ const ChatInput = ({ onSendMessage, userRole }) => {
 
   const handleModalSubmit = (e) => {
     e.preventDefault();
+    const generateMeetLink = () => {
+      const chars = 'abcdefghijklmnopqrstuvwxyz';
+      const randomStr = (length) => Array.from({length}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+      return `https://meet.google.com/${randomStr(3)}-${randomStr(4)}-${randomStr(3)}`;
+    };
+
     if (activeModal === 'assignment') {
       onSendMessage({
         type: 'assignment',
@@ -106,7 +112,8 @@ const ChatInput = ({ onSendMessage, userRole }) => {
         classDetails: {
           topic: modalData.topic,
           scheduledTime: modalData.scheduledTime || new Date(Date.now() + 3600000).toISOString(),
-          duration: modalData.duration || 60
+          duration: modalData.duration || 60,
+          meetLink: generateMeetLink()
         }
       });
     }

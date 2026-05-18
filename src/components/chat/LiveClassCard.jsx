@@ -9,6 +9,11 @@ const LiveClassCard = ({ message, isMe, userRole }) => {
   const dateString = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const timeString = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
+  const handleJoin = () => {
+    const link = message.classDetails?.meetLink || 'https://meet.google.com/';
+    window.open(link, '_blank');
+  };
+
   return (
     <div className={`mt-1 mb-2 rounded-xl border ${isMe ? 'bg-[#ccebc6] border-[#b0dfa3]' : 'bg-blue-50 border-blue-100'} p-3 sm:p-4 min-w-[250px] shadow-sm`}>
       <div className="flex items-center gap-3 mb-3 pb-3 border-b border-black/10">
@@ -38,7 +43,7 @@ const LiveClassCard = ({ message, isMe, userRole }) => {
             ? 'bg-green-600 hover:bg-green-700 text-white shadow-md' 
             : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
         }`}
-        onClick={() => alert("Joining live class... (WebRTC implementation required)")}
+        onClick={handleJoin}
       >
         <span>Join Class</span>
         <ChevronRight size={16} />
