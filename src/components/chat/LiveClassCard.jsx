@@ -45,7 +45,7 @@ const LiveClassCard = ({ message, isMe, userRole }) => {
         }`}
         onClick={handleJoin}
       >
-        <span>Join Class</span>
+        <span>Join Live Class</span>
         <ChevronRight size={16} />
       </button>
     </div>

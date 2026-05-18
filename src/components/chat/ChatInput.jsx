@@ -91,12 +91,6 @@ const ChatInput = ({ onSendMessage, userRole }) => {
 
   const handleModalSubmit = (e) => {
     e.preventDefault();
-    const generateMeetLink = () => {
-      const chars = 'abcdefghijklmnopqrstuvwxyz';
-      const randomStr = (length) => Array.from({length}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-      return `https://meet.google.com/${randomStr(3)}-${randomStr(4)}-${randomStr(3)}`;
-    };
-
     if (activeModal === 'assignment') {
       onSendMessage({
         type: 'assignment',
@@ -113,7 +107,7 @@ const ChatInput = ({ onSendMessage, userRole }) => {
           topic: modalData.topic,
           scheduledTime: modalData.scheduledTime || new Date(Date.now() + 3600000).toISOString(),
           duration: modalData.duration || 60,
-          meetLink: generateMeetLink()
+          meetLink: modalData.meetLink || 'https://meet.google.com/'
         }
       });
     }
@@ -282,6 +276,10 @@ const ChatInput = ({ onSendMessage, userRole }) => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Duration (minutes)</label>
                       <input required type="number" min="15" value={modalData.duration || 60} onChange={e => setModalData({...modalData, duration: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Google Meet Link</label>
+                      <input type="url" placeholder="https://meet.google.com/..." value={modalData.meetLink || ''} onChange={e => setModalData({...modalData, meetLink: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     </div>
                   </>
                 )}
