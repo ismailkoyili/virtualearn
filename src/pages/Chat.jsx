@@ -59,7 +59,7 @@ const Chat = () => {
         if (querySnapshot) {
           querySnapshot.forEach((doc) => {
             const data = doc.data();
-            if (data.uid !== user.id) {
+            if (data.uid !== user.id && data.status !== 'pending') {
               usersListMap.set(data.uid, data);
             }
           });
@@ -69,7 +69,7 @@ const Chat = () => {
         try {
           const localUsers = JSON.parse(localStorage.getItem('virtulearn_users') || '[]');
           localUsers.forEach((localUser) => {
-            if (localUser.uid !== user.id && !usersListMap.has(localUser.uid)) {
+            if (localUser.uid !== user.id && localUser.status !== 'pending' && !usersListMap.has(localUser.uid)) {
               usersListMap.set(localUser.uid, localUser);
             }
           });

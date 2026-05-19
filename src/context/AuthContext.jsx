@@ -23,6 +23,7 @@ export const AuthProvider = ({ children }) => {
       if (currentUser) {
         // Fetch user role from Firestore or fallback to photoURL (where we stash it)
         let role = currentUser.photoURL || 'student';
+        let status = 'approved';
         try {
           const fetchPromise = getDoc(doc(db, 'users', currentUser.uid));
           const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000));
@@ -30,6 +31,7 @@ export const AuthProvider = ({ children }) => {
           
           if (userDoc.exists()) {
             role = userDoc.data().role || 'student';
+            status = userDoc.data().status || 'approved';
           }
         } catch (error) {
           console.error("Error fetching user role:", error);
@@ -40,10 +42,16 @@ export const AuthProvider = ({ children }) => {
           id: currentUser.uid,
           name: currentUser.displayName || 'Student',
           email: currentUser.email,
-          role: role
+          role: role,
+          status: status
         });
       } else {
-        setUser(null);
+        // Check for local admin session
+        if (localStorage.getItem('admin_session') === 'true') {
+          setUser({ id: 'admin', role: 'admin', name: 'Administrator' });
+        } else {
+          setUser(null);
+        }
       }
       setLoading(false);
     });
@@ -70,6 +78,7 @@ export const AuthProvider = ({ children }) => {
           name: name,
           email: userCredential.user.email,
           role: role,
+          status: 'pending',
           createdAt: new Date().toISOString()
         };
         if (existingIndex >= 0) {
@@ -89,6 +98,7 @@ export const AuthProvider = ({ children }) => {
           name: name,
           email: userCredential.user.email,
           role: role,
+          status: 'pending',
           createdAt: new Date().toISOString()
         });
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000));
@@ -97,15 +107,10 @@ export const AuthProvider = ({ children }) => {
         console.warn("Error saving user to Firestore (possibly offline or timeout):", firestoreError);
       }
 
-      // Update local state immediately to reflect the new name and role
-      setUser({
-        id: userCredential.user.uid,
-        name: name,
-        email: userCredential.user.email,
-        role: role
-      });
+      // Automatically sign out because account needs approval
+      await signOut(auth);
 
-      return userCredential.user;
+      return { success: true, pending: true };
     } catch (error) {
       // Map Firebase errors to user-friendly messages
       let message = "Failed to create an account.";
@@ -123,7 +128,17 @@ export const AuthProvider = ({ children }) => {
       // Fallback to the role stashed in photoURL if Firestore fails
       let actualRole = userCredential.user.photoURL || 'student';
       let userName = userCredential.user.displayName || 'User';
+      let status = 'approved';
       
+      // Check local storage first for quick status check
+      try {
+        const localUsers = JSON.parse(localStorage.getItem('virtulearn_users') || '[]');
+        const localUser = localUsers.find(u => u.uid === userCredential.user.uid);
+        if (localUser && localUser.status) {
+          status = localUser.status;
+        }
+      } catch (e) {}
+
       try {
         const fetchPromise = getDoc(doc(db, 'users', userCredential.user.uid));
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000));
@@ -132,9 +147,15 @@ export const AuthProvider = ({ children }) => {
         if (userDoc.exists()) {
           actualRole = userDoc.data().role || actualRole;
           userName = userDoc.data().name || userName;
+          status = userDoc.data().status || status;
         }
       } catch (firestoreError) {
         console.warn("Could not fetch user document (possibly offline or timeout). Defaulting to Auth profile.", firestoreError);
+      }
+      
+      if (status === 'pending') {
+        await signOut(auth);
+        throw new Error("Your account is pending admin approval.");
       }
       
       // Set local state immediately to prevent immediate redirect bouncing from protected routes
@@ -142,7 +163,8 @@ export const AuthProvider = ({ children }) => {
         id: userCredential.user.uid,
         name: userName,
         email: userCredential.user.email,
-        role: actualRole
+        role: actualRole,
+        status: status
       });
 
       return actualRole;
@@ -159,16 +181,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const adminLogin = async (username, password) => {
+    if (username === 'ISMADL' && password === '32963296121') {
+      localStorage.setItem('admin_session', 'true');
+      setUser({ id: 'admin', role: 'admin', name: 'Administrator' });
+      return true;
+    }
+    throw new Error("Invalid administrator credentials");
+  };
+
   const logout = async () => {
     try {
-      await signOut(auth);
+      localStorage.removeItem('admin_session');
+      if (auth.currentUser) {
+        await signOut(auth);
+      } else {
+        setUser(null);
+      }
     } catch (error) {
       console.error("Error signing out:", error);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, login, adminLogin, signup, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );

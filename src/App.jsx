@@ -8,6 +8,8 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
 import TeacherDashboard from './pages/TeacherDashboard';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -82,6 +84,8 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
             <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
+            <Route path="/admin-login" element={<AdminLogin />} />
+            <Route path="/admin-dashboard" element={<AdminDashboard />} />
           </Routes>
         </Router>
       </AuthProvider>
