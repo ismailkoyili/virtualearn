@@ -182,7 +182,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const adminLogin = async (username, password) => {
-    if (username === 'ismadl@edu' && password === '32963296121') {
+    if (username === 'ismadl@edu' && password === '9846765535') {
       localStorage.setItem('admin_session', 'true');
       setUser({ id: 'admin', role: 'admin', name: 'Administrator' });
       return true;
