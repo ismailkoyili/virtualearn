@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        // Special case for the primary admin email if they happen to use Google with that same email
+        // Special case for the primary admin email
         if (currentUser.email === 'ismadl@edu') {
           setUser({
             id: currentUser.uid,
@@ -34,7 +34,13 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          // Add a timeout to the Firestore fetch to prevent "offline" hanging
+          const fetchPromise = getDoc(doc(db, 'users', currentUser.uid));
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Connection timeout")), 5000)
+          );
+
+          const userDoc = await Promise.race([fetchPromise, timeoutPromise]);
           
           if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -46,9 +52,6 @@ export const AuthProvider = ({ children }) => {
               status: userData.status || 'pending'
             });
           } else {
-            // User exists in Auth but not in Firestore yet (first time sign-in)
-            // We set the user object with 'pending' status but no role yet
-            // The Signup/Login page will handle role selection for new users
             setUser({
               id: currentUser.uid,
               name: currentUser.displayName,
@@ -58,7 +61,15 @@ export const AuthProvider = ({ children }) => {
             });
           }
         } catch (error) {
-          console.error("Error fetching user data:", error);
+          console.error("AuthContext: Error fetching user data:", error);
+          // Fallback user object if Firestore fails so the app doesn't stay blank/blocked
+          setUser({
+            id: currentUser.uid,
+            name: currentUser.displayName,
+            email: currentUser.email,
+            role: 'student', // Default role
+            status: 'pending' // Force pending if we can't verify
+          });
         }
       } else {
         setUser(null);
