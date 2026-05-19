@@ -117,6 +117,17 @@ const Chat = () => {
         localMsgs.forEach(msg => {
           if (!msgsMap.has(msg.id)) {
             msgsMap.set(msg.id, msg);
+          } else {
+            const existingMsg = msgsMap.get(msg.id);
+            if (msg.submissions && msg.submissions.length > 0) {
+              const mergedSubmissions = [...(existingMsg.submissions || [])];
+              msg.submissions.forEach(sub => {
+                if (!mergedSubmissions.find(s => s.studentId === sub.studentId && s.fileName === sub.fileName)) {
+                  mergedSubmissions.push(sub);
+                }
+              });
+              existingMsg.submissions = mergedSubmissions;
+            }
           }
         });
       } catch (e) {
@@ -146,6 +157,17 @@ const Chat = () => {
             localMsgs.forEach(msg => {
               if (!msgsMap.has(msg.id)) {
                 msgsMap.set(msg.id, msg);
+              } else {
+                const existingMsg = msgsMap.get(msg.id);
+                if (msg.submissions && msg.submissions.length > 0) {
+                  const mergedSubmissions = [...(existingMsg.submissions || [])];
+                  msg.submissions.forEach(sub => {
+                    if (!mergedSubmissions.find(s => s.studentId === sub.studentId && s.fileName === sub.fileName)) {
+                      mergedSubmissions.push(sub);
+                    }
+                  });
+                  existingMsg.submissions = mergedSubmissions;
+                }
               }
             });
           } catch (e) {}
