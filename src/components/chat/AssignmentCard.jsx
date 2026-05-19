@@ -26,6 +26,40 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
         const reader = new FileReader();
         reader.onload = async (event) => {
           const base64String = event.target.result;
+          setStatus('Uploading...');
+          
+          let extractedText = '';
+          
+          if (file.type.startsWith('image/')) {
+            try {
+              setStatus('Extracting Text (AI)...');
+              const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+              if (apiKey) {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{
+                      parts: [
+                        { text: "Extract all text from this image. Output only the extracted text with no markdown formatting. If there is no text, output 'No text found in image.'" },
+                        {
+                          inlineData: {
+                            mimeType: file.type,
+                            data: base64String.split(',')[1]
+                          }
+                        }
+                      ]
+                    }]
+                  })
+                });
+                const data = await response.json();
+                extractedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              }
+            } catch (err) {
+              console.error('Error extracting text with Gemini:', err);
+            }
+          }
+          
           setStatus('Submitted');
           
           const newSubmission = {
@@ -34,6 +68,7 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
             fileName: file.name,
             fileSize: file.size,
             fileData: base64String,
+            extractedText: extractedText,
             submittedAt: new Date().toISOString()
           };
 
@@ -102,6 +137,20 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
       window.open(sub.fileData, '_blank');
     }
   };
+  
+  const handleDownloadText = (e, sub) => {
+    e.preventDefault();
+    if (!sub.extractedText) return;
+    const blob = new Blob([sub.extractedText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${sub.fileName.split('.')[0]}_extracted.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const isSubmitted = status === 'Submitted' || submissions.some(s => s.studentId === user?.id);
 
@@ -143,10 +192,11 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
               {!isSubmitted ? (
                 <button 
                   onClick={handleUpload}
-                  className="w-full py-2 px-4 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-semibold text-gray-700 transition-all shadow-sm"
+                  disabled={status !== 'Pending'}
+                  className="w-full py-2 px-4 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-semibold text-gray-700 transition-all shadow-sm disabled:opacity-50"
                 >
                   <Upload size={16} className="text-gray-500" />
-                  <span>Upload Work</span>
+                  <span>{status === 'Pending' ? 'Upload Work' : status}</span>
                 </button>
               ) : (
                 <div className="w-full py-2 px-4 rounded-lg bg-green-100 border border-green-200 flex items-center justify-center gap-2 text-sm font-semibold text-green-700">
@@ -193,13 +243,24 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
                         </p>
                       </div>
                     </div>
-                    <button 
-                      onClick={(e) => handleDownload(e, sub)}
-                      className="text-purple-600 hover:bg-purple-200 bg-purple-100 p-2 rounded-full transition-colors shrink-0 flex items-center justify-center"
-                      title="Download Submission"
-                    >
-                      <Download size={18} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {sub.extractedText && (
+                        <button 
+                          onClick={(e) => handleDownloadText(e, sub)}
+                          className="text-orange-600 hover:bg-orange-200 bg-orange-100 p-2 rounded-full transition-colors shrink-0 flex items-center justify-center"
+                          title="Download Extracted Text (AI)"
+                        >
+                          <FileText size={18} />
+                        </button>
+                      )}
+                      <button 
+                        onClick={(e) => handleDownload(e, sub)}
+                        className="text-purple-600 hover:bg-purple-200 bg-purple-100 p-2 rounded-full transition-colors shrink-0 flex items-center justify-center"
+                        title="Download Original Submission"
+                      >
+                        <Download size={18} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
