@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, AlertCircle, Briefcase, CheckCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Briefcase, CheckCircle, User } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Signup = () => {
+  const [name, setName] = useState('');
   const [role, setRole] = useState('student');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -26,6 +27,7 @@ const Signup = () => {
       } else {
         // New user, move to role selection
         setTempUser(user);
+        setName(user.displayName || '');
         setStep(2);
       }
     } catch (err) {
@@ -36,11 +38,11 @@ const Signup = () => {
   };
 
   const handleCompleteRegistration = async () => {
-    if (!tempUser) return;
+    if (!tempUser || !name.trim()) return;
     setError('');
     setIsLoading(true);
     try {
-      await completeRegistration(tempUser.uid, tempUser.displayName, tempUser.email, role);
+      await completeRegistration(tempUser.uid, name, tempUser.email, role);
       setSuccess(true);
       setStep(3);
     } catch (err) {
@@ -131,8 +133,26 @@ const Signup = () => {
               <p className="text-sm text-gray-600 text-center mb-4 italic">
                 Signed in as: <span className="font-bold text-gray-900">{tempUser?.email}</span>
               </p>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3 text-center">I am a:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Your Full Name</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                    <User size={18} />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/60 backdrop-blur-sm transition-all outline-none"
+                    placeholder="Enter your full name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3 text-center">Register as a:</label>
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     onClick={() => setRole('student')}
@@ -145,7 +165,7 @@ const Signup = () => {
                     onClick={() => setRole('teacher')}
                     className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${role === 'teacher' ? 'border-purple-600 bg-purple-50 text-purple-700' : 'border-gray-100 hover:bg-gray-50'}`}
                   >
-                    <UserPlus size={24} className="mb-2" />
+                    <UserPlusIcon size={24} className="mb-2" />
                     <span className="font-bold">Teacher</span>
                   </button>
                 </div>
@@ -154,8 +174,8 @@ const Signup = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleCompleteRegistration}
-                disabled={isLoading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all"
+                disabled={isLoading || !name.trim()}
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50"
               >
                 {isLoading ? 'Processing...' : 'Complete Registration'}
               </motion.button>
@@ -186,8 +206,8 @@ const Signup = () => {
   );
 };
 
-// Internal replacement for missing UserPlus import if needed, but let's assume it's available or use a standard one
-const UserPlus = ({ size, className }) => (
+// Internal replacement for missing UserPlus import if needed
+const UserPlusIcon = ({ size, className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
     <circle cx="9" cy="7" r="4"></circle>
