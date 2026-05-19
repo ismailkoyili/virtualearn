@@ -7,15 +7,30 @@ import { useAuth } from '../context/AuthContext';
 const Login = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState('Connecting...');
+  const [showRedirectOption, setShowRedirectOption] = useState(false);
   const { googleSignIn } = useAuth();
   const navigate = useNavigate();
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = async (method = 'popup') => {
     setError('');
     setIsLoading(true);
+    setLoadingText(method === 'popup' ? 'Connecting...' : 'Redirecting...');
+
+    let popupTimer;
+    if (method === 'popup') {
+      popupTimer = setTimeout(() => {
+        setLoadingText('Check for blocked popup...');
+        setShowRedirectOption(true);
+      }, 5000);
+    }
 
     try {
-      const { isNewUser, role } = await googleSignIn();
+      const result = await googleSignIn(method);
+      if (method === 'redirect') return;
+
+      if (popupTimer) clearTimeout(popupTimer);
+      const { isNewUser, role } = result;
 
       if (isNewUser) {
         // Redirect to signup because they haven't created an account yet
@@ -89,16 +104,29 @@ const Login = () => {
               Access the Student or Teacher portal using your authorized Google account.
             </p>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleGoogleLogin}
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-200 rounded-xl shadow-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 transition-all"
-            >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-              {isLoading ? 'Connecting...' : 'Sign in with Google'}
-            </motion.button>
+            <div className="space-y-3">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleGoogleLogin('popup')}
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-200 rounded-xl shadow-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 transition-all"
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+                {isLoading ? loadingText : 'Sign in with Google'}
+              </motion.button>
+
+              {showRedirectOption && (
+                <motion.button
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={() => handleGoogleLogin('redirect')}
+                  className="w-full py-2.5 px-4 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 rounded-xl transition-all border border-blue-100"
+                >
+                  Popup blocked? Try Redirect Method
+                </motion.button>
+              )}
+            </div>
 
             <div className="relative my-8">
               <div className="absolute inset-0 flex items-center">

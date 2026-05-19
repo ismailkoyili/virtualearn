@@ -11,12 +11,13 @@ const Signup = () => {
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('Creating Account...');
+  const [showRedirectOption, setShowRedirectOption] = useState(false);
 
   const { googleSignIn, completeRegistration } = useAuth();
   const navigate = useNavigate();
 
-  const handleSignup = async (e) => {
-    e.preventDefault();
+  const handleSignup = async (e, method = 'popup') => {
+    if (e) e.preventDefault();
     if (!name.trim()) {
       setError("Please enter your full name.");
       return;
@@ -24,15 +25,25 @@ const Signup = () => {
 
     setError('');
     setIsLoading(true);
-    setLoadingText('Opening Google Login...');
+    setLoadingText(method === 'popup' ? 'Opening Google Login...' : 'Redirecting to Google...');
 
-    const popupTimer = setTimeout(() => {
-      setLoadingText('Check for blocked popup...');
-    }, 3000);
+    let popupTimer;
+    if (method === 'popup') {
+      popupTimer = setTimeout(() => {
+        setLoadingText('Check for blocked popup...');
+        setShowRedirectOption(true);
+      }, 5000);
+    } else {
+      // Save state for when they come back
+      localStorage.setItem('pendingRegistration', JSON.stringify({ name, role }));
+    }
 
     try {
-      const { isNewUser, user, role: existingRole } = await googleSignIn();
-      clearTimeout(popupTimer);
+      const result = await googleSignIn(method);
+      if (method === 'redirect') return; // Page will redirect
+
+      if (popupTimer) clearTimeout(popupTimer);
+      const { isNewUser, user, role: existingRole } = result;
 
       if (!isNewUser) {
         // User already has an account, ignore the form and just log them in
@@ -166,7 +177,7 @@ const Signup = () => {
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 space-y-3">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -177,6 +188,18 @@ const Signup = () => {
                   <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
                   {isLoading ? loadingText : 'Sign Up with Google'}
                 </motion.button>
+
+                {showRedirectOption && !success && (
+                  <motion.button
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    type="button"
+                    onClick={(e) => handleSignup(e, 'redirect')}
+                    className="w-full py-3 px-4 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 rounded-xl transition-all border border-blue-100"
+                  >
+                    Popup blocked? Try Redirect Method
+                  </motion.button>
+                )}
               </div>
 
               <p className="text-[11px] text-gray-500 text-center mt-4 px-4 leading-relaxed">
