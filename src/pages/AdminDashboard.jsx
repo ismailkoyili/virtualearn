@@ -26,12 +26,18 @@ const AdminDashboard = () => {
     setLoading(true);
     try {
       // 1. Fetch from Firestore
-      const usersRef = collection(db, 'users');
-      const fetchPromise = getDocs(usersRef);
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
-      
-      const querySnapshot = await Promise.race([fetchPromise, timeoutPromise]);
       const usersMap = new Map();
+      let querySnapshot = null;
+
+      try {
+        const usersRef = collection(db, 'users');
+        const fetchPromise = getDocs(usersRef);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
+        
+        querySnapshot = await Promise.race([fetchPromise, timeoutPromise]);
+      } catch (dbErr) {
+        console.warn('Firestore fetch failed, falling back to local storage', dbErr);
+      }
       
       if (querySnapshot) {
         querySnapshot.forEach((doc) => {
