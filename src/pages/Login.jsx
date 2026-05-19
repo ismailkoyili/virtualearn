@@ -1,29 +1,31 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowLeft, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Shield } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { googleSignIn } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
     setError('');
     setIsLoading(true);
 
     try {
-      const role = await login(email, password);
-      if (role === 'teacher') {
+      const { isNewUser, role } = await googleSignIn();
+
+      if (isNewUser) {
+        // Redirect to signup to select role
+        navigate('/signup');
+      } else if (role === 'teacher') {
         navigate('/teacher-dashboard');
-      } else {
+      } else if (role === 'student') {
         navigate('/dashboard');
+      } else {
+        setError("Account status unknown. Please contact support.");
       }
     } catch (err) {
       setError(err.message);
@@ -54,7 +56,6 @@ const Login = () => {
         </Link>
 
         <div className="glass-panel p-8 sm:p-10 border border-white/40 shadow-2xl relative overflow-hidden">
-          {/* Top highlight line */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500"></div>
 
           <div className="text-center mb-10">
@@ -82,78 +83,47 @@ const Login = () => {
             </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                  <Mail size={18} />
-                </div>
-                <input 
-                  type="email" 
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/60 backdrop-blur-sm transition-all outline-none"
-                  placeholder="student@virtulearn.edu"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium text-gray-700">Password</label>
-                <a href="#" className="text-sm text-blue-600 hover:text-blue-800 font-medium">Forgot password?</a>
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                  <Lock size={18} />
-                </div>
-                <input 
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/60 backdrop-blur-sm transition-all outline-none"
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-blue-500 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center">
-              <input 
-                id="remember-me" 
-                name="remember-me" 
-                type="checkbox" 
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                Remember me
-              </label>
-            </div>
+          <div className="space-y-6">
+            <p className="text-sm text-gray-600 text-center mb-4">
+              Access the Student or Teacher portal using your authorized Google account.
+            </p>
 
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              type="submit"
+              onClick={handleGoogleLogin}
               disabled={isLoading}
-              className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-200 rounded-xl shadow-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 transition-all"
             >
-              {isLoading ? 'Signing In...' : 'Sign in to Portal'}
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+              {isLoading ? 'Connecting...' : 'Sign in with Google'}
             </motion.button>
-          </form>
+
+            <div className="relative my-8">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white/80 px-2 text-gray-500 backdrop-blur-sm">New to VirtuLearn?</span>
+              </div>
+            </div>
+
+            <Link
+              to="/signup"
+              className="w-full flex justify-center py-3 px-4 border border-blue-600 rounded-xl text-sm font-bold text-blue-600 hover:bg-blue-50 transition-all text-center"
+            >
+              Create an Account
+            </Link>
+          </div>
 
           <div className="mt-8 pt-6 border-t border-gray-200/50 text-center">
-            <p className="text-sm text-gray-600">
-              Need an account? <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-500">Create one here</Link>
-            </p>
+            <Link
+              to="/admin-login"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-wider"
+            >
+              <Shield size={14} />
+              Administrator Access
+            </Link>
           </div>
         </div>
       </motion.div>

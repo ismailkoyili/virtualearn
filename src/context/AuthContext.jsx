@@ -1,10 +1,10 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut, 
   onAuthStateChanged,
-  updateProfile
+  signInWithEmailAndPassword
 } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -18,33 +18,48 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Listen for Firebase authentication state changes
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        // Fetch user role from Firestore
-        let role = 'student';
-        let status = 'approved';
-        let name = currentUser.displayName || 'Student';
+        // Special case for the primary admin email if they happen to use Google with that same email
+        if (currentUser.email === 'ismadl@edu') {
+          setUser({
+            id: currentUser.uid,
+            name: 'Administrator',
+            email: currentUser.email,
+            role: 'admin',
+            status: 'approved'
+          });
+          setLoading(false);
+          return;
+        }
 
         try {
           const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
           
           if (userDoc.exists()) {
-            role = userDoc.data().role || 'student';
-            status = userDoc.data().status || 'approved';
-            name = userDoc.data().name || name;
+            const userData = userDoc.data();
+            setUser({
+              id: currentUser.uid,
+              name: userData.name || currentUser.displayName,
+              email: currentUser.email,
+              role: userData.role || 'student',
+              status: userData.status || 'pending'
+            });
+          } else {
+            // User exists in Auth but not in Firestore yet (first time sign-in)
+            // We set the user object with 'pending' status but no role yet
+            // The Signup/Login page will handle role selection for new users
+            setUser({
+              id: currentUser.uid,
+              name: currentUser.displayName,
+              email: currentUser.email,
+              role: null,
+              status: 'pending'
+            });
           }
         } catch (error) {
-          console.error("Error fetching user data from Firestore:", error);
+          console.error("Error fetching user data:", error);
         }
-
-        setUser({
-          id: currentUser.uid,
-          name: name,
-          email: currentUser.email,
-          role: role,
-          status: status
-        });
       } else {
         setUser(null);
       }
@@ -54,76 +69,54 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  const signup = async (name, email, password, role = 'student') => {
+  const googleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
       
-      await updateProfile(userCredential.user, {
-        displayName: name
-      });
-
-      // Save user to Firestore 'users' collection
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        uid: userCredential.user.uid,
-        name: name,
-        email: userCredential.user.email,
-        role: role,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      });
-
-      // Automatically sign out because account needs approval
-      await signOut(auth);
-
-      return { success: true, pending: true };
-    } catch (error) {
-      let message = "Failed to create an account.";
-      if (error.code === 'auth/email-already-in-use') message = "This email is already registered.";
-      if (error.code === 'auth/weak-password') message = "Password should be at least 6 characters.";
-      if (error.code === 'auth/invalid-email') message = "Please enter a valid email address.";
-      throw new Error(message);
-    }
-  };
-
-  const login = async (email, password) => {
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
       
       if (!userDoc.exists()) {
-        throw new Error("User record not found.");
+        // New user - they will need to select a role in the UI
+        return { isNewUser: true, user };
       }
 
       const userData = userDoc.data();
-
-      if (userData.status === 'pending') {
+      if (userData.status === 'pending' && user.email !== 'ismadl@edu') {
         await signOut(auth);
         throw new Error("Your account is pending admin approval.");
       }
       
-      setUser({
-        id: userCredential.user.uid,
-        name: userData.name || userCredential.user.displayName,
-        email: userCredential.user.email,
-        role: userData.role,
-        status: userData.status
+      return { isNewUser: false, role: userData.role };
+    } catch (error) {
+      console.error("Google Sign-In Error:", error);
+      throw error;
+    }
+  };
+
+  const completeRegistration = async (uid, name, email, role) => {
+    try {
+      await setDoc(doc(db, 'users', uid), {
+        uid,
+        name,
+        email,
+        role,
+        status: 'pending',
+        createdAt: new Date().toISOString()
       });
 
-      return userData.role;
+      // Force sign out because they are now pending
+      await signOut(auth);
+      return true;
     } catch (error) {
-      let message = error.message;
-      if (error.code === 'auth/user-not-found') message = "No account found with this email.";
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') message = "Incorrect password.";
-      if (error.code === 'auth/too-many-requests') message = "Too many failed attempts. Try again later.";
-
-      throw new Error(message);
+      console.error("Error completing registration:", error);
+      throw error;
     }
   };
 
   const adminLogin = async (username, password) => {
     try {
-      // Direct credential check as requested by the user
       if (username === 'ismadl@edu' && password === '9846765535') {
         setUser({
           id: 'admin_primary',
@@ -135,7 +128,6 @@ export const AuthProvider = ({ children }) => {
         return true;
       }
 
-      // Fallback to Firebase Auth for other potential admin accounts
       const userCredential = await signInWithEmailAndPassword(auth, username, password);
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
 
@@ -169,7 +161,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, adminLogin, signup, logout }}>
+    <AuthContext.Provider value={{ user, googleSignIn, completeRegistration, adminLogin, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );
