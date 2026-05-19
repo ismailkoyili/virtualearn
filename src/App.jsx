@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Dashboard from './pages/Dashboard';
-import Chat from './pages/Chat';
-import TeacherDashboard from './pages/TeacherDashboard';
-import AdminLogin from './pages/AdminLogin';
-import AdminDashboard from './pages/AdminDashboard';
+
+// Lazy load components to improve initial load speed
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Chat = lazy(() => import('./pages/Chat'));
+const TeacherDashboard = lazy(() => import('./pages/TeacherDashboard'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -47,10 +49,10 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Show splash screen for 2 seconds
+    // Reduced splash screen timeout for better UX
     const timer = setTimeout(() => {
       setLoading(false);
-    }, 2000);
+    }, 800);
     return () => clearTimeout(timer);
   }, []);
 
@@ -77,16 +79,22 @@ function App() {
 
       <AuthProvider>
         <Router>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
-            <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
-            <Route path="/admin-login" element={<AdminLogin />} />
-            <Route path="/admin-dashboard" element={<AdminDashboard />} />
-          </Routes>
+          <Suspense fallback={
+            <div className="fixed inset-0 flex justify-center items-center bg-[#f8fafc]">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+            </div>
+          }>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
+              <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
+              <Route path="/admin-login" element={<AdminLogin />} />
+              <Route path="/admin-dashboard" element={<AdminDashboard />} />
+            </Routes>
+          </Suspense>
         </Router>
       </AuthProvider>
     </>
