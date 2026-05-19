@@ -18,8 +18,9 @@ const Login = () => {
       const { isNewUser, role } = await googleSignIn();
 
       if (isNewUser) {
-        // Redirect to signup to select role
-        navigate('/signup');
+        // Redirect to signup because they haven't created an account yet
+        setError("Account not found. Please create an account first.");
+        setTimeout(() => navigate('/signup'), 2500);
       } else if (role === 'teacher') {
         navigate('/teacher-dashboard');
       } else if (role === 'student') {
