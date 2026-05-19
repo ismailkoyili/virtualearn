@@ -13,27 +13,39 @@ const Signup = () => {
   const [step, setStep] = useState(1); // 1: Google Auth, 2: Role Selection, 3: Success
   const [tempUser, setTempUser] = useState(null);
 
+  const [loadingText, setLoadingText] = useState('Connecting...');
+
   const { googleSignIn, completeRegistration } = useAuth();
   const navigate = useNavigate();
 
   const handleGoogleSignup = async () => {
     setError('');
     setIsLoading(true);
+    setLoadingText('Opening Google Login...');
+
+    // Popup reminder
+    const popupTimer = setTimeout(() => {
+      setLoadingText('Check for blocked popup...');
+    }, 3000);
+
     try {
       const { isNewUser, user, role: existingRole } = await googleSignIn();
+      clearTimeout(popupTimer);
+
       if (!isNewUser) {
-        // User already exists, redirect based on role
+        setLoadingText('Redirecting...');
         navigate(existingRole === 'teacher' ? '/teacher-dashboard' : '/dashboard');
       } else {
-        // New user, move to role selection
         setTempUser(user);
         setName(user.displayName || '');
         setStep(2);
       }
     } catch (err) {
-      setError(err.message);
+      clearTimeout(popupTimer);
+      setError(err.message || "Failed to connect to Google.");
     } finally {
       setIsLoading(false);
+      setLoadingText('Connecting...');
     }
   };
 
@@ -118,7 +130,7 @@ const Signup = () => {
                 className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-200 rounded-xl shadow-sm text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 transition-all"
               >
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-                {isLoading ? 'Connecting...' : 'Continue with Google'}
+                {isLoading ? loadingText : 'Continue with Google'}
               </motion.button>
               <div className="mt-8 pt-6 border-t border-gray-200/50 text-center">
                 <p className="text-sm text-gray-600">
