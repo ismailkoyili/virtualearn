@@ -121,10 +121,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const adminLogin = async (email, password) => {
+  const adminLogin = async (username, password) => {
     try {
-      // Use Firebase Auth for admin login as well
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Direct credential check as requested by the user
+      if (username === 'ismadl@edu' && password === '9846765535') {
+        setUser({
+          id: 'admin_primary',
+          name: 'Administrator',
+          email: 'ismadl@edu',
+          role: 'admin',
+          status: 'approved'
+        });
+        return true;
+      }
+
+      // Fallback to Firebase Auth for other potential admin accounts
+      const userCredential = await signInWithEmailAndPassword(auth, username, password);
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
 
       if (userDoc.exists() && userDoc.data().role === 'admin') {
@@ -141,7 +153,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error("You do not have administrator privileges.");
       }
     } catch (error) {
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-email') {
         throw new Error("Invalid administrator credentials");
       }
       throw error;
