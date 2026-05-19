@@ -85,23 +85,38 @@ export const AuthProvider = ({ children }) => {
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
-      if (!userDoc.exists()) {
-        // New user - they will need to select a role in the UI
-        return { isNewUser: true, user };
-      }
 
-      const userData = userDoc.data();
-      if (userData.status === 'pending' && user.email !== 'ismadl@edu') {
-        await signOut(auth);
-        throw new Error("Your account is pending admin approval.");
+      try {
+        const fetchPromise = getDoc(doc(db, 'users', user.uid));
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Database connection timed out")), 8000)
+        );
+
+        const userDoc = await Promise.race([fetchPromise, timeoutPromise]);
+
+        if (!userDoc.exists()) {
+          return { isNewUser: true, user };
+        }
+
+        const userData = userDoc.data();
+        if (userData.status === 'pending' && user.email !== 'ismadl@edu') {
+          await signOut(auth);
+          throw new Error("Your account is pending admin approval.");
+        }
+
+        return { isNewUser: false, role: userData.role };
+      } catch (dbError) {
+        console.warn("AuthContext: Firestore check failed, but Auth succeeded.", dbError);
+        if (user.email === 'ismadl@edu') {
+          return { isNewUser: false, role: 'admin' };
+        }
+        throw new Error("Could not verify account status. Please check your internet connection.");
       }
-      
-      return { isNewUser: false, role: userData.role };
     } catch (error) {
       console.error("Google Sign-In Error:", error);
+      if (error.code === 'auth/network-request-failed') {
+        throw new Error("Network error. Please check your internet connection.");
+      }
       throw error;
     }
   };
