@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { FileText, Upload, CheckCircle, Clock, X, Download } from 'lucide-react';
 import { doc, setDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 
 const AssignmentCard = ({ message, isMe, userRole }) => {
@@ -22,17 +23,28 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
     input.onchange = async () => {
       if (input.files.length > 0) {
         const file = input.files[0];
-        
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          const base64String = event.target.result;
-          setStatus('Uploading...');
+        setStatus('Uploading...');
+
+        try {
+          // 1. Upload to Firebase Storage
+          const storagePath = `assignments/${message.id}/${user.id}_${Date.now()}_${file.name}`;
+          const storageRef = ref(storage, storagePath);
+          const snapshot = await uploadBytes(storageRef, file);
+          const downloadURL = await getDownloadURL(snapshot.ref);
           
           let extractedText = '';
           
+          // 2. Optional AI text extraction (using base64 only for the API call if needed)
           if (file.type.startsWith('image/')) {
             try {
               setStatus('Extracting Text (AI)...');
+              const reader = new FileReader();
+              const base64Promise = new Promise((resolve) => {
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsDataURL(file);
+              });
+              const base64String = await base64Promise;
+
               const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
               if (apiKey) {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
@@ -41,7 +53,7 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
                   body: JSON.stringify({
                     contents: [{
                       parts: [
-                        { text: "Extract all text from this image. Output only the extracted text with no markdown formatting. If there is no text, output 'No text found in image.'" },
+                        { text: "Extract all text from this image. Output only the extracted text with no markdown formatting." },
                         {
                           inlineData: {
                             mimeType: file.type,
@@ -67,41 +79,23 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
             studentName: user?.name || 'Student',
             fileName: file.name,
             fileSize: file.size,
-            fileData: base64String,
+            fileUrl: downloadURL, // Store the Cloud URL instead of base64
             extractedText: extractedText,
             submittedAt: new Date().toISOString()
           };
 
           if (message.id) {
-            // Update local storage fallback
-            try {
-              if (message.chatId) {
-                const localMsgs = JSON.parse(localStorage.getItem(`messages_${message.chatId}`) || '[]');
-                const msgIndex = localMsgs.findIndex(m => m.id === message.id);
-                if (msgIndex !== -1) {
-                  if (!localMsgs[msgIndex].submissions) {
-                    localMsgs[msgIndex].submissions = [];
-                  }
-                  localMsgs[msgIndex].submissions.push(newSubmission);
-                  localStorage.setItem(`messages_${message.chatId}`, JSON.stringify(localMsgs));
-                }
-              }
-            } catch (e) {
-              console.warn("Could not save submission locally", e);
-            }
-
-            // Update Firebase
-            try {
-              const msgRef = doc(db, 'messages', message.id);
-              await setDoc(msgRef, {
-                submissions: arrayUnion(newSubmission)
-              }, { merge: true });
-            } catch (e) {
-              console.error("Error updating submission in Firebase", e);
-            }
+            // Update Firestore only
+            const msgRef = doc(db, 'messages', message.id);
+            await setDoc(msgRef, {
+              submissions: arrayUnion(newSubmission)
+            }, { merge: true });
           }
-        };
-        reader.readAsDataURL(file);
+        } catch (e) {
+          console.error("Error uploading to Firebase Storage", e);
+          setStatus('Upload Failed');
+          alert("Failed to upload file. Please check your connection.");
+        }
       }
     };
     input.click();
@@ -109,10 +103,10 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
 
   const handleDownload = (e, sub) => {
     e.preventDefault();
-    if (!sub.fileData) return;
-    
-    try {
-      // Create a blob from base64
+    if (sub.fileUrl) {
+      window.open(sub.fileUrl, '_blank');
+    } else if (sub.fileData) {
+      // Compatibility for older Base64 submissions
       const arr = sub.fileData.split(',');
       const mime = arr[0].match(/:(.*?);/)[1];
       const bstr = atob(arr[1]);
@@ -123,7 +117,6 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
       }
       const blob = new Blob([u8arr], { type: mime });
       const url = URL.createObjectURL(blob);
-      
       const a = document.createElement('a');
       a.href = url;
       a.download = sub.fileName || 'submission';
@@ -131,10 +124,6 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Error downloading file", err);
-      // Fallback
-      window.open(sub.fileData, '_blank');
     }
   };
   
@@ -192,11 +181,11 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
               {!isSubmitted ? (
                 <button 
                   onClick={handleUpload}
-                  disabled={status !== 'Pending'}
+                  disabled={status !== 'Pending' && status !== 'Upload Failed'}
                   className="w-full py-2 px-4 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 flex items-center justify-center gap-2 text-sm font-semibold text-gray-700 transition-all shadow-sm disabled:opacity-50"
                 >
                   <Upload size={16} className="text-gray-500" />
-                  <span>{status === 'Pending' ? 'Upload Work' : status}</span>
+                  <span>{status === 'Pending' || status === 'Upload Failed' ? 'Upload Work' : status}</span>
                 </button>
               ) : (
                 <div className="w-full py-2 px-4 rounded-lg bg-green-100 border border-green-200 flex items-center justify-center gap-2 text-sm font-semibold text-green-700">

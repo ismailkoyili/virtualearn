@@ -32,63 +32,32 @@ const TeacherDashboard = () => {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      // Fetch all users to account for older test accounts that might not have a 'role' field
       const q = collection(db, 'users');
-      // Add timeout to getDocs to prevent hanging when offline
-      const fetchPromise = getDocs(q);
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000));
-      
-      let querySnapshot = null;
-      try {
-        querySnapshot = await Promise.race([fetchPromise, timeoutPromise]);
-        console.debug('TeacherDashboard: fetched users count=', querySnapshot.size);
-      } catch (err) {
-        console.warn('TeacherDashboard: Firestore fetch timed out, falling back to localStorage.', err);
-      }
-
-      try {
-        console.debug('TeacherDashboard: current user=', user);
-      } catch (e) {
-        console.debug('TeacherDashboard: user not available yet');
-      }
+      const querySnapshot = await getDocs(q);
       
       const mine = [];
       const unassigned = [];
       
-      const processUser = (data, id) => {
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const id = docSnap.id;
         const isStudent = data.role === 'student' || !data.role;
 
         if (isStudent) {
           if (data.assignedTeacherId === user.id) {
-            if (!mine.find(s => s.id === id)) mine.push({ id, ...data });
+            mine.push({ id, ...data });
           } else if (!data.assignedTeacherId) {
-            if (!unassigned.find(s => s.id === id)) unassigned.push({ id, ...data });
+            unassigned.push({ id, ...data });
           }
         }
-      };
-
-      if (querySnapshot) {
-        querySnapshot.forEach((docSnap) => {
-          processUser(docSnap.data(), docSnap.id);
-        });
-      }
-
-      // Merge with localStorage
-      try {
-        const localUsers = JSON.parse(localStorage.getItem('virtulearn_users') || '[]');
-        localUsers.forEach((localUser) => {
-          processUser(localUser, localUser.uid);
-        });
-      } catch (e) {
-        console.warn("Could not read from localStorage:", e);
-      }
+      });
       
       setMyStudents(mine);
       setUnassignedStudents(unassigned);
       setError(null);
     } catch (error) {
       console.error("Error fetching students:", error);
-      setError("Could not connect to the database. Make sure you have created a Firestore Database in your Firebase Console and that your browser isn't blocking the connection.");
+      setError("Could not connect to the database. Please check your internet connection and Firebase configuration.");
     } finally {
       setLoading(false);
     }
@@ -98,28 +67,10 @@ const TeacherDashboard = () => {
     setAssigningId(studentId);
     try {
       const studentRef = doc(db, 'users', studentId);
-      const updatePromise = updateDoc(studentRef, {
+      await updateDoc(studentRef, {
         assignedTeacherId: user.id
       });
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000));
-      
-      try {
-        await Promise.race([updatePromise, timeoutPromise]);
-      } catch (err) {
-        console.warn("Firestore updateDoc timed out, updating local storage only.", err);
-      }
 
-      // Update local storage
-      try {
-        const localUsers = JSON.parse(localStorage.getItem('virtulearn_users') || '[]');
-        const userIndex = localUsers.findIndex(u => u.uid === studentId);
-        if (userIndex >= 0) {
-          localUsers[userIndex].assignedTeacherId = user.id;
-          localStorage.setItem('virtulearn_users', JSON.stringify(localUsers));
-        }
-      } catch (e) {
-        console.warn("Could not update localStorage:", e);
-      }
       // Optimistic update
       const studentToMove = unassignedStudents.find(s => s.id === studentId);
       if (studentToMove) {

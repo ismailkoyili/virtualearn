@@ -23,61 +23,35 @@ const Chat = () => {
   
   const messagesEndRef = useRef(null);
 
-  // Handle window resize for responsive layout toggle
   useEffect(() => {
     const handleResize = () => setIsMobileView(window.innerWidth < 640);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Redirect if not logged in
   useEffect(() => {
     if (!user) {
       navigate('/login');
     }
   }, [user, navigate]);
 
-  // Fetch users with localStorage fallback
   useEffect(() => {
     if (!user) return;
     
     const fetchUsers = async () => {
       try {
         const usersRef = collection(db, 'users');
-        const fetchPromise = getDocs(usersRef);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000));
-        
-        let querySnapshot = null;
-        try {
-          querySnapshot = await Promise.race([fetchPromise, timeoutPromise]);
-        } catch (err) {
-          console.warn('Chat: Firestore fetch timed out, falling back to localStorage.', err);
-        }
+        const querySnapshot = await getDocs(usersRef);
 
-        const usersListMap = new Map();
+        const usersList = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.uid !== user.id && data.status !== 'pending') {
+            usersList.push(data);
+          }
+        });
 
-        if (querySnapshot) {
-          querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.uid !== user.id && data.status !== 'pending') {
-              usersListMap.set(data.uid, data);
-            }
-          });
-        }
-
-        // Merge with localStorage
-        try {
-          const localUsers = JSON.parse(localStorage.getItem('virtulearn_users') || '[]');
-          localUsers.forEach((localUser) => {
-            if (localUser.uid !== user.id && localUser.status !== 'pending' && !usersListMap.has(localUser.uid)) {
-              usersListMap.set(localUser.uid, localUser);
-            }
-          });
-        } catch (e) {
-          console.warn("Could not read from localStorage:", e);
-        }
-
-        setUsers(Array.from(usersListMap.values()));
+        setUsers(usersList);
       } catch (error) {
         console.error("Error fetching users:", error);
       } finally {
@@ -88,12 +62,10 @@ const Chat = () => {
     fetchUsers();
   }, [user]);
 
-  // Get Chat ID
   const getChatId = (user1, user2) => {
     return [user1, user2].sort().join('_');
   };
 
-  // Fetch messages real-time
   useEffect(() => {
     if (!user || !selectedUser) return;
 
@@ -106,86 +78,18 @@ const Chat = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgsMap = new Map();
+      const msgs = [];
       snapshot.forEach((doc) => {
-        msgsMap.set(doc.id, { id: doc.id, ...doc.data() });
+        msgs.push({ id: doc.id, ...doc.data() });
       });
-
-      // Merge with localStorage
-      try {
-        const localMsgs = JSON.parse(localStorage.getItem(`messages_${chatId}`) || '[]');
-        localMsgs.forEach(msg => {
-          if (!msgsMap.has(msg.id)) {
-            msgsMap.set(msg.id, msg);
-          } else {
-            const existingMsg = msgsMap.get(msg.id);
-            if (msg.submissions && msg.submissions.length > 0) {
-              const mergedSubmissions = [...(existingMsg.submissions || [])];
-              msg.submissions.forEach(sub => {
-                if (!mergedSubmissions.find(s => s.studentId === sub.studentId && s.fileName === sub.fileName)) {
-                  mergedSubmissions.push(sub);
-                }
-              });
-              existingMsg.submissions = mergedSubmissions;
-            }
-          }
-        });
-      } catch (e) {
-        console.warn('Could not read messages from localStorage', e);
-      }
-
-      const finalMsgs = Array.from(msgsMap.values()).sort((a, b) => {
-        const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.localTimestamp || 0);
-        const timeB = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.localTimestamp || 0);
-        return timeA - timeB;
-      });
-      setMessages(finalMsgs);
+      setMessages(msgs);
     }, (error) => {
       console.error("Error fetching messages:", error);
-      // Fallback if index is missing or offline
-      if (error.code === 'failed-precondition' || error.code === 'unavailable') {
-        const fallbackQuery = query(messagesRef, where('chatId', '==', chatId));
-        onSnapshot(fallbackQuery, (fbSnapshot) => {
-          const msgsMap = new Map();
-          fbSnapshot.forEach((doc) => {
-            msgsMap.set(doc.id, { id: doc.id, ...doc.data() });
-          });
-
-          // Merge with localStorage
-          try {
-            const localMsgs = JSON.parse(localStorage.getItem(`messages_${chatId}`) || '[]');
-            localMsgs.forEach(msg => {
-              if (!msgsMap.has(msg.id)) {
-                msgsMap.set(msg.id, msg);
-              } else {
-                const existingMsg = msgsMap.get(msg.id);
-                if (msg.submissions && msg.submissions.length > 0) {
-                  const mergedSubmissions = [...(existingMsg.submissions || [])];
-                  msg.submissions.forEach(sub => {
-                    if (!mergedSubmissions.find(s => s.studentId === sub.studentId && s.fileName === sub.fileName)) {
-                      mergedSubmissions.push(sub);
-                    }
-                  });
-                  existingMsg.submissions = mergedSubmissions;
-                }
-              }
-            });
-          } catch (e) {}
-
-          const finalMsgs = Array.from(msgsMap.values()).sort((a, b) => {
-            const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.localTimestamp || 0);
-            const timeB = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.localTimestamp || 0);
-            return timeA - timeB;
-          });
-          setMessages(finalMsgs);
-        });
-      }
     });
 
     return () => unsubscribe();
   }, [user, selectedUser]);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -200,28 +104,14 @@ const Chat = () => {
       chatId,
       senderId: user.id,
       receiverId: selectedUser.uid,
-      localTimestamp: Date.now(),
+      timestamp: serverTimestamp(),
       ...msgData
     };
 
-    // 1. Save to LocalStorage immediately (for cross-session local testing)
     try {
-      const localMsgs = JSON.parse(localStorage.getItem(`messages_${chatId}`) || '[]');
-      localMsgs.push({ id: localId, ...messagePayload });
-      localStorage.setItem(`messages_${chatId}`, JSON.stringify(localMsgs));
-    } catch (e) {
-      console.warn("Could not save message to localStorage", e);
-    }
-
-    // 2. Try saving to Firebase with the exact same ID
-    try {
-      await setDoc(doc(db, 'messages', localId), {
-        ...messagePayload,
-        timestamp: serverTimestamp() // Add Firebase timestamp
-      });
+      await setDoc(doc(db, 'messages', localId), messagePayload);
     } catch (error) {
       console.error("Error sending message to Firebase:", error);
-      console.log("Message was still saved locally.");
     }
   };
 
@@ -247,7 +137,7 @@ const Chat = () => {
         </div>
       </nav>
 
-      {/* Main Chat Container - WhatsApp Style */}
+      {/* Main Chat Container */}
       <div className="flex-1 w-full max-w-[1600px] mx-auto sm:py-6 sm:px-6 lg:px-8 flex overflow-hidden">
         <div className="flex w-full bg-white sm:rounded-xl sm:shadow-lg border-none overflow-hidden h-full">
           
@@ -269,7 +159,7 @@ const Chat = () => {
                 <img src="/logo.png" alt="VirtuLearn" className="h-24 object-contain mb-8 opacity-40 grayscale" />
                 <h3 className="text-3xl font-light text-gray-600 mb-4">VirtuLearn Web Chat</h3>
                 <p className="mt-2 text-[15px] text-gray-500 max-w-md leading-relaxed">
-                  Send and receive messages without keeping your phone online.<br/>
+                  Connect with your {user?.role === 'teacher' ? 'students' : 'teachers'} instantly.
                   Use VirtuLearn Chat for assignments, live classes, and seamless communication.
                 </p>
                 <div className="mt-8 flex items-center justify-center gap-2 text-sm text-gray-400 bg-gray-200/50 px-4 py-2 rounded-full">
@@ -302,7 +192,7 @@ const Chat = () => {
                   </div>
                 </div>
 
-                {/* Messages Area - WhatsApp Pattern Background */}
+                {/* Messages Area */}
                 <div 
                   className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col"
                   style={{

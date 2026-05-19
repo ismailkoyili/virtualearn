@@ -25,45 +25,15 @@ const AdminDashboard = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // 1. Fetch from Firestore
-      const usersMap = new Map();
-      let querySnapshot = null;
-
-      try {
-        const usersRef = collection(db, 'users');
-        const fetchPromise = getDocs(usersRef);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
-        
-        querySnapshot = await Promise.race([fetchPromise, timeoutPromise]);
-      } catch (dbErr) {
-        console.warn('Firestore fetch failed, falling back to local storage', dbErr);
-      }
+      const usersRef = collection(db, 'users');
+      const querySnapshot = await getDocs(usersRef);
       
-      if (querySnapshot) {
-        querySnapshot.forEach((doc) => {
-          usersMap.set(doc.id, { id: doc.id, ...doc.data() });
-        });
-      }
+      const list = [];
+      querySnapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
 
-      // 2. Merge with LocalStorage (useful for local dev without firebase connectivity)
-      try {
-        const localUsers = JSON.parse(localStorage.getItem('virtulearn_users') || '[]');
-        localUsers.forEach(localUser => {
-          if (!usersMap.has(localUser.uid)) {
-            usersMap.set(localUser.uid, { id: localUser.uid, ...localUser });
-          } else {
-            // merge status if needed
-            const existing = usersMap.get(localUser.uid);
-            if (!existing.status && localUser.status) {
-              existing.status = localUser.status;
-            }
-          }
-        });
-      } catch (e) {
-        console.warn('Local storage error', e);
-      }
-
-      setUsersList(Array.from(usersMap.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
+      setUsersList(list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
     } catch (err) {
       console.error('Failed to fetch users:', err);
       setError('Could not fetch users. Please check your connection.');
@@ -74,19 +44,8 @@ const AdminDashboard = () => {
 
   const handleApprove = async (userId) => {
     try {
-      // Update Firebase
       const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, { status: 'approved' }).catch(e => console.warn('Firebase update failed', e));
-
-      // Update LocalStorage
-      try {
-        const localUsers = JSON.parse(localStorage.getItem('virtulearn_users') || '[]');
-        const index = localUsers.findIndex(u => u.uid === userId);
-        if (index !== -1) {
-          localUsers[index].status = 'approved';
-          localStorage.setItem('virtulearn_users', JSON.stringify(localUsers));
-        }
-      } catch (e) {}
+      await updateDoc(userRef, { status: 'approved' });
 
       // Update Local State
       setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: 'approved' } : u));
