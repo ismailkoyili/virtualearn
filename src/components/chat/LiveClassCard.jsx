@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Video, Calendar, Clock, ChevronRight } from 'lucide-react';
 
 const LiveClassCard = ({ message, isMe, userRole }) => {
   const { topic, scheduledTime, duration } = message.classDetails || {};
   
   // Format the date
-  const dateObj = new Date(scheduledTime || Date.now());
-  const dateString = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const timeString = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const { dateString, timeString } = useMemo(() => {
+    const dateObj = new Date(scheduledTime || Date.now());
+    return {
+      dateString: dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+      timeString: dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    };
+  }, [scheduledTime]);
 
   const handleJoin = () => {
     const link = message.classDetails?.meetLink || 'https://meet.google.com/';

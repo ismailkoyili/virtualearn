@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { LogOut, User, CheckCircle, Calendar, Clock, AlertCircle, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -24,15 +24,8 @@ const Dashboard = () => {
     return `${year}-${month}-${day}`;
   };
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    } else {
-      fetchAttendance();
-    }
-  }, [user, navigate]);
-
-  const fetchAttendance = async () => {
+  const fetchAttendance = useCallback(async () => {
+    if (!user) return;
     try {
       const q = query(
         collection(db, 'attendance'), 
@@ -61,7 +54,15 @@ const Dashboard = () => {
     } finally {
       setLoadingAttendance(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    } else {
+      fetchAttendance();
+    }
+  }, [user, navigate, fetchAttendance]);
 
   const markAttendance = async () => {
     if (todayMarked) return;

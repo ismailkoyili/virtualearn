@@ -1,16 +1,20 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Check, CheckCheck, FileText, Download } from 'lucide-react';
 import LiveClassCard from './LiveClassCard';
 import AssignmentCard from './AssignmentCard';
 
 const MessageBubble = ({ message, isMe, userRole }) => {
-  const timeStr = message.timestamp 
-    ? new Date(message.timestamp.toDate ? message.timestamp.toDate() : message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-    : '...';
+  const timeStr = useMemo(() => {
+    return message.timestamp
+      ? new Date(message.timestamp.toDate ? message.timestamp.toDate() : message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+      : '...';
+  }, [message.timestamp]);
 
   // Read status mock (since we don't have read tracking in the db yet)
-  const isRead = message.timestamp && Date.now() - new Date(message.timestamp.toDate ? message.timestamp.toDate() : message.timestamp).getTime() > 5000;
+  const isRead = useMemo(() => {
+    return message.timestamp && Date.now() - new Date(message.timestamp.toDate ? message.timestamp.toDate() : message.timestamp).getTime() > 5000;
+  }, [message.timestamp]);
 
   return (
     <motion.div 

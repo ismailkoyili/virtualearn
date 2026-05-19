@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, User, Users, BookOpen, Settings, UserPlus, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react';
+import { LogOut, User, Users, UserPlus, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 
 const TeacherDashboard = () => {
   const { user, logout } = useAuth();
@@ -21,15 +21,8 @@ const TeacherDashboard = () => {
     navigate('/');
   };
 
-  useEffect(() => {
-    if (!user || user.role !== 'teacher') {
-      navigate('/login');
-    } else {
-      fetchStudents();
-    }
-  }, [user, navigate]);
-
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     try {
       const q = collection(db, 'users');
@@ -61,7 +54,15 @@ const TeacherDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'teacher') {
+      navigate('/login');
+    } else {
+      fetchStudents();
+    }
+  }, [user, navigate, fetchStudents]);
 
   const assignStudent = async (studentId) => {
     setAssigningId(studentId);

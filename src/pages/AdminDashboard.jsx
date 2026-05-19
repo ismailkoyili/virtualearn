@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
@@ -13,16 +13,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      navigate('/admin-login');
-      return;
-    }
-
-    fetchUsers();
-  }, [user, navigate]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const usersRef = collection(db, 'users');
@@ -40,7 +31,16 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      navigate('/admin-login');
+      return;
+    }
+
+    fetchUsers();
+  }, [user, navigate, fetchUsers]);
 
   const handleApprove = async (userId) => {
     try {

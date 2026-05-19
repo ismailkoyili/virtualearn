@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { FileText, Upload, CheckCircle, Clock, X, Download } from 'lucide-react';
 import { doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -11,8 +11,10 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
   const [showModal, setShowModal] = useState(false);
   const { user } = useAuth();
 
-  const dateObj = new Date(dueDate || Date.now());
-  const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const dateString = useMemo(() => {
+    const dateObj = new Date(dueDate || Date.now());
+    return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }, [dueDate]);
 
   const submissions = message.submissions || [];
 
