@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, Upload, CheckCircle, Clock, X, Download } from 'lucide-react';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -16,34 +16,91 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
   const submissions = message.submissions || [];
 
   const handleUpload = () => {
-    // Mock upload action that actually updates the mock assignment in firebase
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*,.pdf';
     input.onchange = async () => {
       if (input.files.length > 0) {
         const file = input.files[0];
-        setStatus('Submitted');
         
-        if (message.id) {
-          try {
-            const msgRef = doc(db, 'messages', message.id);
-            await updateDoc(msgRef, {
-              submissions: arrayUnion({
-                studentId: user?.id || 'unknown',
-                studentName: user?.name || 'Student',
-                fileName: file.name,
-                fileSize: file.size,
-                submittedAt: new Date().toISOString()
-              })
-            });
-          } catch (e) {
-            console.error("Error updating submission", e);
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const base64String = event.target.result;
+          setStatus('Submitted');
+          
+          const newSubmission = {
+            studentId: user?.id || 'unknown',
+            studentName: user?.name || 'Student',
+            fileName: file.name,
+            fileSize: file.size,
+            fileData: base64String,
+            submittedAt: new Date().toISOString()
+          };
+
+          if (message.id) {
+            // Update local storage fallback
+            try {
+              if (message.chatId) {
+                const localMsgs = JSON.parse(localStorage.getItem(`messages_${message.chatId}`) || '[]');
+                const msgIndex = localMsgs.findIndex(m => m.id === message.id);
+                if (msgIndex !== -1) {
+                  if (!localMsgs[msgIndex].submissions) {
+                    localMsgs[msgIndex].submissions = [];
+                  }
+                  localMsgs[msgIndex].submissions.push(newSubmission);
+                  localStorage.setItem(`messages_${message.chatId}`, JSON.stringify(localMsgs));
+                }
+              }
+            } catch (e) {
+              console.warn("Could not save submission locally", e);
+            }
+
+            // Update Firebase
+            try {
+              const msgRef = doc(db, 'messages', message.id);
+              await setDoc(msgRef, {
+                submissions: arrayUnion(newSubmission)
+              }, { merge: true });
+            } catch (e) {
+              console.error("Error updating submission in Firebase", e);
+            }
           }
-        }
+        };
+        reader.readAsDataURL(file);
       }
     };
     input.click();
+  };
+
+  const handleDownload = (e, sub) => {
+    e.preventDefault();
+    if (!sub.fileData) return;
+    
+    try {
+      // Create a blob from base64
+      const arr = sub.fileData.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const blob = new Blob([u8arr], { type: mime });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = sub.fileName || 'submission';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error downloading file", err);
+      // Fallback
+      window.open(sub.fileData, '_blank');
+    }
   };
 
   const isSubmitted = status === 'Submitted' || submissions.some(s => s.studentId === user?.id);
@@ -136,7 +193,11 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
                         </p>
                       </div>
                     </div>
-                    <button className="text-purple-600 hover:bg-purple-200 bg-purple-100 p-2 rounded-full transition-colors shrink-0">
+                    <button 
+                      onClick={(e) => handleDownload(e, sub)}
+                      className="text-purple-600 hover:bg-purple-200 bg-purple-100 p-2 rounded-full transition-colors shrink-0 flex items-center justify-center"
+                      title="Download Submission"
+                    >
                       <Download size={18} />
                     </button>
                   </div>
