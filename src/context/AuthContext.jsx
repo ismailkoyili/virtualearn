@@ -87,14 +87,29 @@ export const AuthProvider = ({ children }) => {
       const user = result.user;
 
       try {
-        const fetchPromise = getDoc(doc(db, 'users', user.uid));
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Database connection timed out")), 8000)
-        );
+        // Retry logic for Firestore fetch to handle flaky connections
+        let userDoc = null;
+        let retries = 0;
+        const maxRetries = 2;
 
-        const userDoc = await Promise.race([fetchPromise, timeoutPromise]);
+        while (retries <= maxRetries) {
+          try {
+            const fetchPromise = getDoc(doc(db, 'users', user.uid));
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("Database connection timed out")), 10000)
+            );
 
-        if (!userDoc.exists()) {
+            userDoc = await Promise.race([fetchPromise, timeoutPromise]);
+            break; // Success, exit loop
+          } catch (retryErr) {
+            retries++;
+            if (retries > maxRetries) throw retryErr;
+            console.warn(`AuthContext: Retry ${retries} for Firestore fetch...`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait before retry
+          }
+        }
+
+        if (!userDoc || !userDoc.exists()) {
           return { isNewUser: true, user };
         }
 

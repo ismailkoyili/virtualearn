@@ -15,11 +15,13 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Initialize Firestore with settings to handle connection issues more gracefully
+// Use even more robust settings for Firestore connection stability
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
-  })
+  }),
+  // This helps in unstable network environments
+  experimentalAutoDetectLongPolling: true
 });
 
 export const storage = getStorage(app);
