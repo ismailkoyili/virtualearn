@@ -1,13 +1,5 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { 
-  signInWithPopup,
-  GoogleAuthProvider,
-  signOut, 
-  onAuthStateChanged,
-  signInWithEmailAndPassword
-} from 'firebase/auth';
 import { auth, db } from '../firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, enableNetwork } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -18,6 +10,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Explicitly enable network on load to prevent "offline" states
+    enableNetwork(db).catch(err => console.error("Firestore: Could not enable network", err));
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         // Special case for the primary admin email
@@ -82,12 +77,17 @@ export const AuthProvider = ({ children }) => {
 
   const googleSignIn = async () => {
     const provider = new GoogleAuthProvider();
+    // Force select account to prevent silent failures
+    provider.setCustomParameters({ prompt: 'select_account' });
+
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
       try {
-        // Retry logic for Firestore fetch to handle flaky connections
+        // Try to get network status back if it was lost
+        await enableNetwork(db).catch(() => {});
+
         let userDoc = null;
         let retries = 0;
         const maxRetries = 2;
@@ -96,16 +96,15 @@ export const AuthProvider = ({ children }) => {
           try {
             const fetchPromise = getDoc(doc(db, 'users', user.uid));
             const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("Database connection timed out")), 10000)
+              setTimeout(() => reject(new Error("Database timeout")), 12000)
             );
 
             userDoc = await Promise.race([fetchPromise, timeoutPromise]);
-            break; // Success, exit loop
+            break;
           } catch (retryErr) {
             retries++;
             if (retries > maxRetries) throw retryErr;
-            console.warn(`AuthContext: Retry ${retries} for Firestore fetch...`);
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
         }
 
@@ -121,18 +120,24 @@ export const AuthProvider = ({ children }) => {
 
         return { isNewUser: false, role: userData.role };
       } catch (dbError) {
-        console.warn("AuthContext: Firestore check failed, but Auth succeeded.", dbError);
+        console.warn("AuthContext: Firestore check failed.", dbError);
         if (user.email === 'ismadl@edu') {
           return { isNewUser: false, role: 'admin' };
         }
-        throw new Error("Could not verify account status. Please check your internet connection.");
+        throw new Error("Connection unstable. Please check your internet and try again.");
       }
     } catch (error) {
       console.error("Google Sign-In Error:", error);
+      if (error.code === 'auth/popup-blocked') {
+        throw new Error("Sign-in popup was blocked by your browser. Please allow popups for this site.");
+      }
       if (error.code === 'auth/network-request-failed') {
         throw new Error("Network error. Please check your internet connection.");
       }
-      throw error;
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error("Sign-in window was closed. Please try again.");
+      }
+      throw new Error(error.message || "Failed to sign in with Google.");
     }
   };
 
