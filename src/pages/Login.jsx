@@ -15,8 +15,10 @@ const Login = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    console.log("Login: Form submitted");
     setError('');
     setIsLoading(true);
+    setLoadingText('Connecting...');
 
     if (!email.trim()) {
       setError('Please enter your email address.');
@@ -30,16 +32,22 @@ const Login = () => {
     }
 
     try {
+      setLoadingText('Checking credentials...');
       const result = await login(email, password);
+
+      setLoadingText('Verifying account...');
+      console.log("Login: Success, navigating to dashboard");
       if (result.role === 'teacher') {
         navigate('/teacher-dashboard');
       } else {
         navigate('/dashboard');
       }
     } catch (err) {
+      console.error("Login: Caught error", err);
       setError(err.message);
     } finally {
       setIsLoading(false);
+      setLoadingText('Connecting...');
     }
   };
 

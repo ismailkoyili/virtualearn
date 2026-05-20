@@ -19,6 +19,7 @@ const Signup = () => {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    console.log("Signup: Form submitted");
 
     if (!name.trim()) {
       setError('Please enter your full name.');
@@ -35,13 +36,17 @@ const Signup = () => {
 
     setError('');
     setIsLoading(true);
-    setLoadingText('Creating account...');
+    setLoadingText('Authenticating...');
 
     try {
+      console.log("Signup: Calling register...");
       await register(name, email, password, role);
+
+      setLoadingText('Saving profile...');
+      console.log("Signup: Register success, navigating to success page");
       navigate('/signup-success');
     } catch (err) {
-      console.error('Signup failed:', err);
+      console.error('Signup: Caught error', err);
       const message = err?.message || (typeof err === 'string' ? err : 'Failed to create account.');
       setError(message);
     } finally {
