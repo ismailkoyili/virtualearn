@@ -4,7 +4,11 @@ import {
   onAuthStateChanged,
   signOut,
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, enableNetwork } from 'firebase/firestore';
 
@@ -48,16 +52,81 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // Helper function to handle the user data fetching logic (reusable for popup and redirect)
+  const handleUserResult = useCallback(async (user) => {
+    try {
+      await enableNetwork(db).catch(() => {});
+
+      let userDoc = null;
+      let retries = 0;
+      const maxRetries = 2;
+
+      while (retries <= maxRetries) {
+        try {
+          const fetchPromise = getDoc(doc(db, 'users', user.uid));
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Database timeout")), 12000)
+          );
+
+          userDoc = await Promise.race([fetchPromise, timeoutPromise]);
+          break;
+        } catch (retryErr) {
+          retries++;
+          if (retries > maxRetries) throw retryErr;
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      }
+
+      if (!userDoc || !userDoc.exists()) {
+        // Check for pending registration from redirect
+        const pending = localStorage.getItem('pendingRegistration');
+        if (pending) {
+          const { name, role } = JSON.parse(pending);
+          localStorage.removeItem('pendingRegistration');
+          await completeRegistration(user.uid, name, user.email, role);
+          return { isNewUser: true, user, registrationCompleted: true };
+        }
+        return { isNewUser: true, user };
+      }
+
+      const userData = userDoc.data();
+      if (userData.status === 'pending' || userData.status === 'Waiting for Admin Approval' && user.email !== 'ismadl@edu.com') {
+        await signOut(auth);
+        throw new Error("Your account is pending admin approval.");
+      }
+
+      return { isNewUser: false, role: userData.role };
+    } catch (dbError) {
+      console.warn("AuthContext: Firestore check failed.", dbError);
+      if (user.email === 'ismadl@edu.com') {
+        return { isNewUser: false, role: 'admin' };
+      }
+      throw new Error(dbError.message || "Connection unstable. Please check your internet and try again.");
+    }
+  }, [completeRegistration]);
+
   useEffect(() => {
     console.log("AuthContext: Initializing...");
     // Explicitly enable network on load to prevent "offline" states
     enableNetwork(db).catch(err => console.error("Firestore: Could not enable network", err));
 
+    // Handle Redirect Result
+    getRedirectResult(auth).then(async (result) => {
+      if (result) {
+        try {
+          await handleUserResult(result.user);
+          // The onAuthStateChanged will handle the state update
+        } catch (error) {
+          console.error("Redirect Result Error:", error);
+        }
+      }
+    }).catch(err => console.error("Redirect Error:", err));
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       console.log("AuthContext: onAuthStateChanged", currentUser ? currentUser.email : "null");
       if (currentUser) {
         // Special case for the primary admin email
-        if (currentUser.email === 'ismadl@edu') {
+        if (currentUser.email === 'ismadl@edu.com') {
           setUser({
             id: currentUser.uid,
             name: 'Administrator',
@@ -117,7 +186,35 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [handleUserResult]);
+
+  const googleSignIn = async (method = 'popup') => {
+    const provider = new GoogleAuthProvider();
+    // Force select account to prevent silent failures
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    try {
+      if (method === 'redirect') {
+        await signInWithRedirect(auth, provider);
+        return; // Execution stops here as page redirects
+      }
+
+      const result = await signInWithPopup(auth, provider);
+      return await handleUserResult(result.user);
+    } catch (error) {
+      console.error("Google Sign-In Error:", error);
+      if (error.code === 'auth/popup-blocked') {
+        throw new Error("Sign-in popup was blocked by your browser. Please allow popups for this site or use the redirect option.");
+      }
+      if (error.code === 'auth/network-request-failed') {
+        throw new Error("Network error. Please check your internet connection.");
+      }
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error("Sign-in window was closed. Please try again.");
+      }
+      throw new Error(error.message || "Failed to sign in with Google.");
+    }
+  };
 
   const register = async (name, email, password, role) => {
     console.log("AuthContext: register start", email);
@@ -186,7 +283,7 @@ export const AuthProvider = ({ children }) => {
     console.log("AuthContext: adminLogin start", username);
     try {
       // 1. Primary Admin Hardcoded Check
-      if (username === 'ismadl@edu' && password === '9846765535') {
+      if (username === 'ismadl@edu.com' && password === '9846765535') {
         console.log("AuthContext: Primary Admin credentials matched");
 
         // Try to sign in with Firebase Auth to get a valid token
@@ -212,7 +309,7 @@ export const AuthProvider = ({ children }) => {
           setUser({
             id: 'admin_primary',
             name: 'Administrator',
-            email: 'ismadl@edu',
+            email: 'ismadl@edu.com',
             role: 'admin',
             status: 'approved'
           });
@@ -259,7 +356,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, register, login, adminLogin, logout }}>
+    <AuthContext.Provider value={{ user, register, login, googleSignIn, completeRegistration, adminLogin, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );
