@@ -78,6 +78,7 @@ const Chat = () => {
     );
 
     const handleSnapshot = (snapshot) => {
+      console.debug('Chat sidebar snapshot update received:', snapshot.size, 'messages');
       setLastMessages(prev => {
         const latest = { ...prev };
         snapshot.forEach((doc) => {
@@ -117,19 +118,20 @@ const Chat = () => {
     return [user1, user2].sort().join('_');
   };
 
+  const currentChatId = user && selectedUser ? getChatId(user.id, selectedUser.uid) : null;
+
   useEffect(() => {
-    if (!user || !selectedUser) return;
+    if (!user || !currentChatId) return;
 
-    const chatId = getChatId(user.id, selectedUser.uid);
     const messagesRef = collection(db, 'messages');
-
     const q = query(
       messagesRef,
-      where('chatId', '==', chatId),
+      where('chatId', '==', currentChatId),
       orderBy('timestamp', 'asc')
     );
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+      console.debug('Selected chat snapshot update:', currentChatId, 'docs=', snapshot.docs.length, 'pending=', snapshot.metadata.hasPendingWrites);
       const serverMsgs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
       setMessages(prevMessages => {
@@ -151,11 +153,9 @@ const Chat = () => {
     });
 
     return () => unsubscribe();
-  }, [user, selectedUser]);
+  }, [user, currentChatId]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
-    // Using a small timeout to ensure DOM is updated
     const timeoutId = setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
@@ -185,12 +185,21 @@ const Chat = () => {
     };
 
     setMessages(prev => [...prev, optimisticMessage]);
+    setLastMessages(prev => ({
+      ...prev,
+      [chatId]: {
+        text: msgData.text || (msgData.type === 'image' ? '📷 Photo' : msgData.type === 'video' ? '🎥 Video' : msgData.type === 'document' ? '📎 File' : 'New message'),
+        timestamp: new Date(),
+        senderId: user.id
+      }
+    }));
 
     try {
+      console.debug('Sending message', localId, 'chatId', chatId, 'payload', messagePayload);
       await setDoc(doc(db, 'messages', localId), messagePayload);
+      console.debug('Message saved to Firestore', localId);
     } catch (error) {
       console.error("Error sending message to Firebase:", error);
-      // Remove optimistic message on error or mark as failed
       setMessages(prev => prev.filter(m => m.id !== localId));
     }
   };
