@@ -3,7 +3,7 @@ import { ArrowLeft, User as UserIcon, MoreVertical, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { collection, query, getDocs, onSnapshot, setDoc, doc, serverTimestamp, orderBy, where, limit } from 'firebase/firestore';
+import { collection, query, onSnapshot, setDoc, doc, serverTimestamp, orderBy, where, limit } from 'firebase/firestore';
 
 // Subcomponents
 import ChatSidebar from '../components/chat/ChatSidebar';
@@ -38,29 +38,24 @@ const Chat = () => {
 
   useEffect(() => {
     if (!user) return;
-    
-    const fetchUsers = async () => {
-      try {
-        const usersRef = collection(db, 'users');
-        const querySnapshot = await getDocs(usersRef);
 
-        const usersList = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.uid !== user.id && (data.status !== 'pending' && data.status !== 'Waiting for Admin Approval')) {
-            usersList.push(data);
-          }
-        });
+    const usersRef = collection(db, 'users');
+    const unsubscribe = onSnapshot(usersRef, (snapshot) => {
+      const usersList = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.uid !== user.id && data.status !== 'pending' && data.status !== 'Waiting for Admin Approval') {
+          usersList.push(data);
+        }
+      });
+      setUsers(usersList);
+      setLoadingUsers(false);
+    }, (error) => {
+      console.error("Error listening for users:", error);
+      setLoadingUsers(false);
+    });
 
-        setUsers(usersList);
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      } finally {
-        setLoadingUsers(false);
-      }
-    };
-    
-    fetchUsers();
+    return () => unsubscribe();
   }, [user]);
 
   useEffect(() => {
@@ -128,33 +123,24 @@ const Chat = () => {
     const chatId = getChatId(user.id, selectedUser.uid);
     const messagesRef = collection(db, 'messages');
 
-    // Removing orderBy('timestamp') to avoid dependency on composite indexes
-    // and to ensure messages with pending server timestamps (which are null)
-    // are not filtered out by Firestore's query engine.
     const q = query(
-      messagesRef, 
-      where('chatId', '==', chatId)
+      messagesRef,
+      where('chatId', '==', chatId),
+      orderBy('timestamp', 'asc')
     );
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
-      const serverMsgs = [];
-      snapshot.forEach((doc) => {
-        serverMsgs.push({ id: doc.id, ...doc.data() });
-      });
+      const serverMsgs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
       setMessages(prevMessages => {
-        // Find optimistic messages that haven't been reconciled yet
         const optimistic = prevMessages.filter(m =>
           m.status === 'sending' && !serverMsgs.some(sm => sm.id === m.id)
         );
 
-        // Merge server messages with remaining optimistic ones
-        // We sort locally to handle null timestamps from pending writes
         return [...serverMsgs, ...optimistic].sort((a, b) => {
           const getTime = (m) => {
             if (m.timestamp?.toMillis) return m.timestamp.toMillis();
             if (m.timestamp instanceof Date) return m.timestamp.getTime();
-            // If it's a pending server timestamp, put it at the end (newest)
             return Date.now();
           };
           return getTime(a) - getTime(b);
