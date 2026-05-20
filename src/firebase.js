@@ -8,7 +8,7 @@ import {
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCk7wzMhvG-tgBJyJZEOD1ccLpxBR014Fs",
+  apiKey: "AIzaSyC-L1L8PeNHBcb61wIYxWZq54DdrzYcjpA",
   authDomain: "virtulearn-portal.firebaseapp.com",
   projectId: "virtulearn-portal",
   storageBucket: "virtulearn-portal.firebasestorage.app",
