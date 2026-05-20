@@ -14,7 +14,7 @@ const LiveClassCard = ({ message, isMe, userRole }) => {
   }, [scheduledTime]);
 
   const handleJoin = () => {
-    const link = message.classDetails?.meetLink || 'https://meet.google.com/';
+    const link = message.classDetails?.meetLink || 'https://meet.google.com/ktq-tdeo-tsy';
     window.open(link, '_blank');
   };
 
