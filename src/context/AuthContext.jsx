@@ -118,7 +118,8 @@ export const AuthProvider = ({ children }) => {
       if (error.code === 'auth/weak-password') {
         throw new Error("Password should be at least 6 characters.");
       }
-      throw new Error(error.message || "Failed to create account.");
+      const message = error?.message || (typeof error === 'string' ? error : 'Failed to create account.');
+      throw new Error(message);
     }
   };
 

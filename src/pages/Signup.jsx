@@ -45,9 +45,12 @@ const Signup = () => {
 
     try {
       await register(name, email, password, role);
+      setLoadingText('Account created!');
       setSuccess(true);
     } catch (err) {
-      setError(err.message || 'Failed to create account.');
+      console.error('Signup failed:', err);
+      const message = err?.message || (typeof err === 'string' ? err : 'Failed to create account.');
+      setError(message);
     } finally {
       setIsLoading(false);
       setLoadingText('Creating Account...');
