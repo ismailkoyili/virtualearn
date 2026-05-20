@@ -3,7 +3,7 @@ import { ArrowLeft, User as UserIcon, MoreVertical, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { collection, query, getDocs, onSnapshot, setDoc, doc, serverTimestamp, orderBy, where } from 'firebase/firestore';
+import { collection, query, getDocs, onSnapshot, setDoc, doc, serverTimestamp, orderBy, where, limit } from 'firebase/firestore';
 
 // Subcomponents
 import ChatSidebar from '../components/chat/ChatSidebar';
