@@ -126,7 +126,8 @@ const Chat = () => {
     const messagesRef = collection(db, 'messages');
     const q = query(
       messagesRef,
-      where('chatId', '==', currentChatId)
+      where('chatId', '==', currentChatId),
+      orderBy('timestamp', 'asc')
     );
 
     console.debug('Subscribing to chat', currentChatId);
