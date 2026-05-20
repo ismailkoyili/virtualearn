@@ -13,8 +13,12 @@ const MessageBubble = ({ message, isMe, userRole }) => {
 
   // Read status mock (since we don't have read tracking in the db yet)
   const isRead = useMemo(() => {
-    return message.timestamp && Date.now() - new Date(message.timestamp.toDate ? message.timestamp.toDate() : message.timestamp).getTime() > 5000;
-  }, [message.timestamp]);
+    // If it's an optimistic message (no timestamp yet or status 'sending'), it's not read
+    if (!message.timestamp || message.status === 'sending') return false;
+
+    const time = message.timestamp.toDate ? message.timestamp.toDate() : message.timestamp;
+    return Date.now() - new Date(time).getTime() > 10000; // Increased to 10s for better "sent" visibility
+  }, [message.timestamp, message.status]);
 
   return (
     <motion.div 

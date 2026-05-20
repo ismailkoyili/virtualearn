@@ -128,16 +128,23 @@ const Chat = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = [];
+      const serverMsgs = [];
       snapshot.forEach((doc) => {
-        msgs.push({ id: doc.id, ...doc.data() });
+        serverMsgs.push({ id: doc.id, ...doc.data() });
       });
 
       setMessages(prevMessages => {
-        // Simple reconciliation: use the server messages but keep track of optimistic ones
-        // In a more complex app, we might merge, but here we can mostly trust onSnapshot
-        // because we use the same ID for setDoc as the optimistic ID.
-        return msgs;
+        // Find optimistic messages that haven't been reconciled yet
+        const optimistic = prevMessages.filter(m =>
+          m.status === 'sending' && !serverMsgs.some(sm => sm.id === m.id)
+        );
+
+        // Merge server messages with remaining optimistic ones
+        return [...serverMsgs, ...optimistic].sort((a, b) => {
+          const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp instanceof Date ? a.timestamp.getTime() : 0);
+          const timeB = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp instanceof Date ? b.timestamp.getTime() : 0);
+          return timeA - timeB;
+        });
       });
     }, (error) => {
       console.error("Error fetching messages:", error);
