@@ -107,7 +107,7 @@ const ChatInput = ({ onSendMessage, userRole }) => {
           topic: modalData.topic,
           scheduledTime: modalData.scheduledTime || new Date(Date.now() + 3600000).toISOString(),
           duration: modalData.duration || 60,
-          meetLink: modalData.meetLink || 'https://meet.google.com/ktq-tdeo-tsy'
+          meetLink: modalData.meetLink || 'meet.google.com/ktq-tdeo-tsy'
         }
       });
     }
@@ -279,7 +279,7 @@ const ChatInput = ({ onSendMessage, userRole }) => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Google Meet Link</label>
-                      <input type="url" placeholder="https://meet.google.com/ktq-tdeo-tsy" value={modalData.meetLink || ''} onChange={e => setModalData({...modalData, meetLink: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                      <input type="text" placeholder="meet.google.com/ktq-tdeo-tsy" value={modalData.meetLink || ''} onChange={e => setModalData({...modalData, meetLink: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     </div>
                   </>
                 )}
