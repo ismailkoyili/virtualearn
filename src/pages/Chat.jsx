@@ -15,6 +15,7 @@ const Chat = () => {
   const navigate = useNavigate();
   
   const [users, setUsers] = useState([]);
+  const [lastMessages, setLastMessages] = useState({});
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,6 +63,55 @@ const Chat = () => {
     fetchUsers();
   }, [user]);
 
+  useEffect(() => {
+    if (!user || users.length === 0) return;
+
+    // Listen for recent messages to update sidebar snippets
+    const messagesRef = collection(db, 'messages');
+    // We want messages where the current user is either sender or receiver
+    const q1 = query(
+      messagesRef,
+      where('senderId', '==', user.id),
+      orderBy('timestamp', 'desc'),
+      limit(100)
+    );
+    const q2 = query(
+      messagesRef,
+      where('receiverId', '==', user.id),
+      orderBy('timestamp', 'desc'),
+      limit(100)
+    );
+
+    const handleSnapshot = (snapshot) => {
+      setLastMessages(prev => {
+        const latest = { ...prev };
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const chatId = data.chatId;
+          const msgTimestamp = data.timestamp?.toMillis ? data.timestamp.toMillis() : (data.timestamp instanceof Date ? data.timestamp.getTime() : 0);
+          const currentTimestamp = latest[chatId]?.timestamp?.toMillis ? latest[chatId].timestamp.toMillis() : (latest[chatId]?.timestamp instanceof Date ? latest[chatId].timestamp.getTime() : 0);
+
+          if (!latest[chatId] || msgTimestamp > currentTimestamp) {
+            latest[chatId] = {
+              text: data.text || (data.type === 'image' ? '📷 Image' : data.type === 'video' ? '🎥 Video' : data.type === 'audio' ? '🎤 Audio' : '📎 Document'),
+              timestamp: data.timestamp,
+              senderId: data.senderId
+            };
+          }
+        });
+        return latest;
+      });
+    };
+
+    const unsubscribe1 = onSnapshot(q1, handleSnapshot);
+    const unsubscribe2 = onSnapshot(q2, handleSnapshot);
+
+    return () => {
+      unsubscribe1();
+      unsubscribe2();
+    };
+  }, [user, users.length]);
+
   const getChatId = (user1, user2) => {
     return [user1, user2].sort().join('_');
   };
@@ -82,7 +132,13 @@ const Chat = () => {
       snapshot.forEach((doc) => {
         msgs.push({ id: doc.id, ...doc.data() });
       });
-      setMessages(msgs);
+
+      setMessages(prevMessages => {
+        // Simple reconciliation: use the server messages but keep track of optimistic ones
+        // In a more complex app, we might merge, but here we can mostly trust onSnapshot
+        // because we use the same ID for setDoc as the optimistic ID.
+        return msgs;
+      });
     }, (error) => {
       console.error("Error fetching messages:", error);
     });
@@ -91,7 +147,12 @@ const Chat = () => {
   }, [user, selectedUser]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Scroll to bottom when messages change
+    // Using a small timeout to ensure DOM is updated
+    const timeoutId = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+    return () => clearTimeout(timeoutId);
   }, [messages]);
 
   const handleSendMessage = async (msgData) => {
@@ -108,10 +169,22 @@ const Chat = () => {
       ...msgData
     };
 
+    // Optimistic Update
+    const optimisticMessage = {
+      id: localId,
+      ...messagePayload,
+      timestamp: new Date(), // Local timestamp for immediate display
+      status: 'sending'
+    };
+
+    setMessages(prev => [...prev, optimisticMessage]);
+
     try {
       await setDoc(doc(db, 'messages', localId), messagePayload);
     } catch (error) {
       console.error("Error sending message to Firebase:", error);
+      // Remove optimistic message on error or mark as failed
+      setMessages(prev => prev.filter(m => m.id !== localId));
     }
   };
 
@@ -143,6 +216,9 @@ const Chat = () => {
           
           <ChatSidebar 
             users={users}
+            lastMessages={lastMessages}
+            getChatId={getChatId}
+            currentUser={user}
             selectedUser={selectedUser}
             setSelectedUser={setSelectedUser}
             searchTerm={searchTerm}

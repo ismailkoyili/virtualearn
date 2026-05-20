@@ -108,7 +108,13 @@ const MessageBubble = ({ message, isMe, userRole }) => {
           <span className="text-[10px] sm:text-xs text-gray-500 select-none">{timeStr}</span>
           {isMe && (
             <span className={isRead ? "text-blue-500" : "text-gray-400"}>
-              {isRead ? <CheckCheck size={14} /> : <Check size={14} />}
+              {message.status === 'sending' ? (
+                <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />
+              ) : isRead ? (
+                <CheckCheck size={14} />
+              ) : (
+                <Check size={14} />
+              )}
             </span>
           )}
         </div>
