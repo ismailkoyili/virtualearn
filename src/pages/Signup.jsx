@@ -17,12 +17,6 @@ const Signup = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!success) return;
-    const timeout = setTimeout(() => navigate('/login'), 3000);
-    return () => clearTimeout(timeout);
-  }, [success, navigate]);
-
   const handleSignup = async (e) => {
     e.preventDefault();
 
@@ -45,8 +39,7 @@ const Signup = () => {
 
     try {
       await register(name, email, password, role);
-      setLoadingText('Account created!');
-      setSuccess(true);
+      navigate('/signup-success');
     } catch (err) {
       console.error('Signup failed:', err);
       const message = err?.message || (typeof err === 'string' ? err : 'Failed to create account.');

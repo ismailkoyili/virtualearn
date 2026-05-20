@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 const Home = lazy(() => import('./pages/Home'));
 const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
+const SignupSuccess = lazy(() => import('./pages/SignupSuccess'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Chat = lazy(() => import('./pages/Chat'));
 const TeacherDashboard = lazy(() => import('./pages/TeacherDashboard'));
@@ -89,6 +90,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/signup-success" element={<SignupSuccess />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
               <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
