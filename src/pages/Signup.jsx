@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, AlertCircle, CheckCircle, User, Briefcase } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Signup = () => {
@@ -15,6 +15,13 @@ const Signup = () => {
   const [loadingText, setLoadingText] = useState('Creating Account...');
 
   const { register } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!success) return;
+    const timeout = setTimeout(() => navigate('/login'), 3000);
+    return () => clearTimeout(timeout);
+  }, [success, navigate]);
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -110,9 +117,10 @@ const Signup = () => {
                 <CheckCircle size={32} className="text-green-600" />
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-3">Account created successfully</h2>
-              <p className="text-gray-600 mb-8 leading-relaxed text-sm bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+              <p className="text-gray-600 mb-4 leading-relaxed text-sm bg-blue-50/50 p-4 rounded-xl border border-blue-100">
                 Please wait for admin approval. We will notify you once your account is reviewed.
               </p>
+              <p className="text-gray-500 text-xs mb-6">Redirecting to login in a few seconds...</p>
               <Link to="/login" className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all">
                 Return to Login
               </Link>
