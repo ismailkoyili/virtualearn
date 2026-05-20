@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }) => {
       console.log("AuthContext: Writing to Firestore...");
       const setDocPromise = setDoc(docRef, data);
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Firestore write timeout")), 10000)
+        setTimeout(() => reject(new Error("Firestore write timeout. Please check your Firebase Database Rules and API Key restrictions in Google Cloud Console.")), 10000)
       );
 
       await Promise.race([setDocPromise, timeoutPromise]);
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }) => {
           // Add a timeout to the Firestore fetch to prevent "offline" hanging
           const fetchPromise = getDoc(doc(db, 'users', currentUser.uid));
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Connection timeout")), 8000)
+            setTimeout(() => reject(new Error("Connection timeout. If this persists on Vercel, check your Firebase API key restrictions.")), 10000)
           );
 
           const userDoc = await Promise.race([fetchPromise, timeoutPromise]);
@@ -151,7 +151,7 @@ export const AuthProvider = ({ children }) => {
       console.log("AuthContext: Fetching user doc...");
       const fetchPromise = getDoc(doc(db, 'users', userCredential.user.uid));
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Database connection timeout")), 10000)
+        setTimeout(() => reject(new Error("Database connection timeout. Ensure your Firebase project is set up and your Vercel domain is authorized in Google Cloud Console.")), 12000)
       );
 
       const userDoc = await Promise.race([fetchPromise, timeoutPromise]);

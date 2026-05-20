@@ -1,10 +1,14 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC-L1L8PeNHBcb61wIYxWZq54DdrzYcjpA",
+  apiKey: "AIzaSyCk7wzMhvG-tgBJyJZEOD1ccLpxBR014Fs",
   authDomain: "virtulearn-portal.firebaseapp.com",
   projectId: "virtulearn-portal",
   storageBucket: "virtulearn-portal.firebasestorage.app",
@@ -14,6 +18,13 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Initialize Firestore with persistence to handle potential network drops on Vercel
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
+
 export const storage = getStorage(app);
 export default app;
