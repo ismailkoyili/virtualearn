@@ -14,10 +14,18 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
 
   const fetchUsers = useCallback(async () => {
+    console.log("AdminDashboard: Starting fetchUsers...");
     setLoading(true);
     try {
       const usersRef = collection(db, 'users');
-      const querySnapshot = await getDocs(usersRef);
+
+      const fetchPromise = getDocs(usersRef);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Database fetch timeout")), 12000)
+      );
+
+      const querySnapshot = await Promise.race([fetchPromise, timeoutPromise]);
+      console.log("AdminDashboard: Successfully fetched", querySnapshot.size, "users");
       
       const list = [];
       querySnapshot.forEach((doc) => {
@@ -25,9 +33,10 @@ const AdminDashboard = () => {
       });
 
       setUsersList(list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
+      setError('');
     } catch (err) {
-      console.error('Failed to fetch users:', err);
-      setError('Could not fetch users. Please check your connection.');
+      console.error('AdminDashboard: Failed to fetch users:', err);
+      setError(`Could not fetch users: ${err.message}. Ensure you have logged in as an administrator.`);
     } finally {
       setLoading(false);
     }
