@@ -104,7 +104,7 @@ const Signup = () => {
               {success ? 'Account Created' : 'Join VirtuLearn'}
             </h1>
             <p className="text-sm font-semibold tracking-widest text-blue-600 uppercase">
-              {success ? 'Pending Approval' : 'Create your account'}
+              {success ? 'Account Created' : 'Create your account'}
             </p>
           </div>
 
@@ -128,9 +128,9 @@ const Signup = () => {
               <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 border-4 border-white shadow-sm">
                 <CheckCircle size={32} className="text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">Wait for Approval</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">Account created successfully</h2>
               <p className="text-gray-600 mb-8 leading-relaxed text-sm bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                Hi <strong className="text-gray-900">{name}</strong>, your request to join as a <strong className="text-blue-700">{role}</strong> is pending administrator approval.
+                Please wait for admin approval. We will notify you once your account is reviewed.
               </p>
               <Link to="/login" className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all">
                 Return to Login

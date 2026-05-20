@@ -68,8 +68,8 @@ const AdminDashboard = () => {
     );
   }
 
-  const pendingUsers = usersList.filter(u => u.status === 'pending');
-  const approvedUsers = usersList.filter(u => u.status !== 'pending');
+  const pendingUsers = usersList.filter(u => u.status === 'pending' || u.status === 'Waiting for Admin Approval');
+  const approvedUsers = usersList.filter(u => (u.status !== 'pending' && u.status !== 'Waiting for Admin Approval'));
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
@@ -180,7 +180,7 @@ const AdminDashboard = () => {
                         {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}
                       </td>
                       <td className="px-6 py-4">
-                        {u.status === 'pending' ? (
+                        {(u.status === 'pending' || u.status === 'Waiting for Admin Approval') ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
                             <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>
                             Pending
@@ -193,7 +193,7 @@ const AdminDashboard = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        {u.status === 'pending' && (
+                        {(u.status === 'pending' || u.status === 'Waiting for Admin Approval') && (
                           <button
                             onClick={() => handleApprove(u.id)}
                             className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-900 hover:bg-black text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"

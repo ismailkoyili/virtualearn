@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
         name,
         email,
         role,
-        status: 'pending',
+        status: 'Waiting for Admin Approval',
         createdAt: new Date().toISOString()
       });
 
@@ -77,7 +77,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       const userData = userDoc.data();
-      if (userData.status === 'pending' && user.email !== 'ismadl@edu') {
+      if ((userData.status === 'pending' || userData.status === 'Waiting for Admin Approval') && user.email !== 'ismadl@edu') {
         await signOut(auth);
         throw new Error("Your account is pending admin approval.");
       }
@@ -139,7 +139,7 @@ export const AuthProvider = ({ children }) => {
               name: userData.name || currentUser.displayName,
               email: currentUser.email,
               role: userData.role || 'student',
-              status: userData.status || 'pending'
+              status: userData.status || 'Waiting for Admin Approval'
             });
           } else {
             setUser({
@@ -147,7 +147,7 @@ export const AuthProvider = ({ children }) => {
               name: currentUser.displayName,
               email: currentUser.email,
               role: null,
-              status: 'pending'
+              status: 'Waiting for Admin Approval'
             });
           }
         } catch (error) {
@@ -158,7 +158,7 @@ export const AuthProvider = ({ children }) => {
             name: currentUser.displayName,
             email: currentUser.email,
             role: 'student', // Default role
-            status: 'pending' // Force pending if we can't verify
+            status: 'Waiting for Admin Approval' // Force pending if we can't verify
           });
         }
       } else {

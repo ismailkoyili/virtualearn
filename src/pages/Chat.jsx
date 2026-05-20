@@ -46,7 +46,7 @@ const Chat = () => {
         const usersList = [];
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          if (data.uid !== user.id && data.status !== 'pending') {
+          if (data.uid !== user.id && (data.status !== 'pending' && data.status !== 'Waiting for Admin Approval')) {
             usersList.push(data);
           }
         });
