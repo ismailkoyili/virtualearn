@@ -61,57 +61,33 @@ const Chat = () => {
   useEffect(() => {
     if (!user || users.length === 0) return;
 
-    // Listen for recent messages to update sidebar snippets
-    const messagesRef = collection(db, 'messages');
-    // We want messages where the current user is either sender or receiver
-    const q1 = query(
-      messagesRef,
-      where('senderId', '==', user.id),
-      orderBy('timestamp', 'desc'),
-      limit(100)
-    );
-    const q2 = query(
-      messagesRef,
-      where('receiverId', '==', user.id),
-      orderBy('timestamp', 'desc'),
-      limit(100)
+    // Listen for recent chat previews to update sidebar snippets
+    const chatPreviewsRef = collection(db, 'chatPreviews');
+    const q = query(
+      chatPreviewsRef,
+      where('users', 'array-contains', user.id)
     );
 
-    const handleSnapshot = (snapshot) => {
-      console.debug('Chat sidebar snapshot update received:', snapshot.size, 'messages');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.debug('Chat sidebar snapshot update received:', snapshot.size, 'chats');
       setLastMessages(prev => {
         const latest = { ...prev };
         snapshot.forEach((doc) => {
           const data = doc.data();
           const chatId = data.chatId;
-          const getTime = (ts) => {
-            if (ts?.toMillis) return ts.toMillis();
-            if (ts instanceof Date) return ts.getTime();
-            return Date.now();
+          latest[chatId] = {
+            text: data.lastMessage,
+            timestamp: data.timestamp,
+            senderId: data.senderId
           };
-
-          const msgTimestamp = getTime(data.timestamp);
-          const currentTimestamp = getTime(latest[chatId]?.timestamp);
-
-          if (!latest[chatId] || msgTimestamp >= currentTimestamp) {
-            latest[chatId] = {
-              text: data.text || (data.type === 'image' ? '📷 Image' : data.type === 'video' ? '🎥 Video' : data.type === 'audio' ? '🎤 Audio' : '📎 Document'),
-              timestamp: data.timestamp,
-              senderId: data.senderId
-            };
-          }
         });
         return latest;
       });
-    };
+    }, (error) => {
+      console.error("Error listening for chat previews:", error);
+    });
 
-    const unsubscribe1 = onSnapshot(q1, handleSnapshot);
-    const unsubscribe2 = onSnapshot(q2, handleSnapshot);
-
-    return () => {
-      unsubscribe1();
-      unsubscribe2();
-    };
+    return () => unsubscribe();
   }, [user, users.length]);
 
   const getChatId = (user1, user2) => {
@@ -124,10 +100,10 @@ const Chat = () => {
     if (!user || !currentChatId) return;
 
     const messagesRef = collection(db, 'messages');
+    // Removed orderBy to bypass composite index requirement
     const q = query(
       messagesRef,
-      where('chatId', '==', currentChatId),
-      orderBy('timestamp', 'asc')
+      where('chatId', '==', currentChatId)
     );
 
     console.debug('Subscribing to chat', currentChatId);
@@ -197,8 +173,19 @@ const Chat = () => {
 
     try {
       console.debug('Sending message', localId, 'chatId', chatId, 'payload', messagePayload);
+      // 1. Write the full message
       await setDoc(doc(db, 'messages', localId), messagePayload);
-      console.debug('Message saved to Firestore', localId);
+      
+      // 2. Write the chat preview document for the sidebar
+      await setDoc(doc(db, 'chatPreviews', chatId), {
+        chatId,
+        users: [user.id, selectedUser.uid],
+        lastMessage: msgData.text || (msgData.type === 'image' ? '📷 Photo' : msgData.type === 'video' ? '🎥 Video' : msgData.type === 'document' ? '📎 File' : 'New message'),
+        timestamp: serverTimestamp(),
+        senderId: user.id
+      }, { merge: true });
+      
+      console.debug('Message saved to Firestore and preview updated', localId);
     } catch (error) {
       console.error("Error sending message to Firebase:", error);
       setMessages(prev => prev.filter(m => m.id !== localId));

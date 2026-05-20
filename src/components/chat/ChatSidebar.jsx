@@ -14,7 +14,24 @@ const ChatSidebar = ({
   isMobileView 
 }) => {
   
-  const filteredUsers = users.filter(u => u.name?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredUsers = users
+    .filter(u => u.name?.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      const chatIdA = getChatId(currentUser.id, a.uid);
+      const chatIdB = getChatId(currentUser.id, b.uid);
+      
+      const timeA = lastMessages[chatIdA]?.timestamp;
+      const timeB = lastMessages[chatIdB]?.timestamp;
+      
+      const getTime = (ts) => {
+        if (!ts) return 0;
+        if (ts.toMillis) return ts.toMillis();
+        if (ts instanceof Date) return ts.getTime();
+        return new Date(ts).getTime() || 0;
+      };
+      
+      return getTime(timeB) - getTime(timeA);
+    });
 
   const formatLastMessageTime = (timestamp) => {
     if (!timestamp) return '';
