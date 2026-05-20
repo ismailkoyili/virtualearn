@@ -126,10 +126,10 @@ const Chat = () => {
     const messagesRef = collection(db, 'messages');
     const q = query(
       messagesRef,
-      where('chatId', '==', currentChatId),
-      orderBy('timestamp', 'asc')
+      where('chatId', '==', currentChatId)
     );
 
+    console.debug('Subscribing to chat', currentChatId);
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
       console.debug('Selected chat snapshot update:', currentChatId, 'docs=', snapshot.docs.length, 'pending=', snapshot.metadata.hasPendingWrites);
       const serverMsgs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
