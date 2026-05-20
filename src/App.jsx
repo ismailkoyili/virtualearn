@@ -49,6 +49,7 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log("VirtuLearn: App Mounted");
     // Reduced splash screen timeout for better UX
     const timer = setTimeout(() => {
       setLoading(false);
