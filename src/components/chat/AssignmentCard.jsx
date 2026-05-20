@@ -28,11 +28,36 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
         setStatus('Uploading...');
 
         try {
-          // 1. Upload to Firebase Storage
-          const storagePath = `assignments/${message.id}/${user.id}_${Date.now()}_${file.name}`;
+          let downloadURL = null;
+          let fileData = null;
+
+          // 1. Attempt Firebase Storage Upload with a 5-second timeout
+          const storagePath = `assignments/${message.id || 'temp'}/${user.id}_${Date.now()}_${file.name}`;
           const storageRef = ref(storage, storagePath);
-          const snapshot = await uploadBytes(storageRef, file);
-          const downloadURL = await getDownloadURL(snapshot.ref);
+          
+          try {
+            const uploadPromise = uploadBytes(storageRef, file);
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Storage upload timeout')), 5000)
+            );
+            const snapshot = await Promise.race([uploadPromise, timeoutPromise]);
+            downloadURL = await getDownloadURL(snapshot.ref);
+          } catch (storageErr) {
+            console.warn("Firebase Storage failed or timed out. Falling back to Base64.", storageErr);
+            // Fallback to Base64 if file is < 800KB (Firestore doc limit is 1MB)
+            if (file.size > 800 * 1024) {
+               setStatus('Upload Failed');
+               alert("File is too large for fallback storage. Please enable Firebase Storage in your console, or select a file under 800KB.");
+               return;
+            }
+            const reader = new FileReader();
+            const base64Promise = new Promise((resolve, reject) => {
+              reader.onload = (e) => resolve(e.target.result);
+              reader.onerror = (e) => reject(e);
+              reader.readAsDataURL(file);
+            });
+            fileData = await base64Promise;
+          }
           
           let extractedText = '';
           
@@ -40,12 +65,16 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
           if (file.type.startsWith('image/')) {
             try {
               setStatus('Extracting Text (AI)...');
-              const reader = new FileReader();
-              const base64Promise = new Promise((resolve) => {
-                reader.onload = (e) => resolve(e.target.result);
-                reader.readAsDataURL(file);
-              });
-              const base64String = await base64Promise;
+              
+              let base64String = fileData;
+              if (!base64String) {
+                const reader = new FileReader();
+                const b64Promise = new Promise((resolve) => {
+                  reader.onload = (e) => resolve(e.target.result);
+                  reader.readAsDataURL(file);
+                });
+                base64String = await b64Promise;
+              }
 
               const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
               if (apiKey) {
@@ -81,7 +110,7 @@ const AssignmentCard = ({ message, isMe, userRole }) => {
             studentName: user?.name || 'Student',
             fileName: file.name,
             fileSize: file.size,
-            fileUrl: downloadURL, // Store the Cloud URL instead of base64
+            ...(downloadURL ? { fileUrl: downloadURL } : { fileData: fileData }),
             extractedText: extractedText,
             submittedAt: new Date().toISOString()
           };
