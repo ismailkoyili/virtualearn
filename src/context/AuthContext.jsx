@@ -183,22 +183,51 @@ export const AuthProvider = ({ children }) => {
   };
 
   const adminLogin = async (username, password) => {
+    console.log("AuthContext: adminLogin start", username);
     try {
+      // 1. Primary Admin Hardcoded Check
       if (username === 'ismadl@edu' && password === '9846765535') {
-        setUser({
-          id: 'admin_primary',
-          name: 'Administrator',
-          email: 'ismadl@edu',
-          role: 'admin',
-          status: 'approved'
-        });
-        return true;
+        console.log("AuthContext: Primary Admin credentials matched");
+
+        // Try to sign in with Firebase Auth to get a valid token
+        try {
+          const userCredential = await signInWithEmailAndPassword(auth, username, password);
+          console.log("AuthContext: Primary Admin Firebase Auth Success");
+
+          // Ensure admin record exists in Firestore
+          const adminDoc = doc(db, 'users', userCredential.user.uid);
+          await setDoc(adminDoc, {
+            uid: userCredential.user.uid,
+            name: 'Administrator',
+            email: username,
+            role: 'admin',
+            status: 'approved',
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+
+          return true;
+        } catch (authErr) {
+          console.warn("AuthContext: Primary Admin Firebase Auth failed, using local bypass", authErr);
+          // Fallback to local state if Firebase Auth fails for this specific user
+          setUser({
+            id: 'admin_primary',
+            name: 'Administrator',
+            email: 'ismadl@edu',
+            role: 'admin',
+            status: 'approved'
+          });
+          return true;
+        }
       }
 
+      // 2. Regular Admin Login via Firebase
       const userCredential = await signInWithEmailAndPassword(auth, username, password);
+      console.log("AuthContext: Admin Firebase Auth success", userCredential.user.uid);
+
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
 
       if (userDoc.exists() && userDoc.data().role === 'admin') {
+        console.log("AuthContext: Admin role verified in Firestore");
         setUser({
           id: userCredential.user.uid,
           name: userDoc.data().name || 'Administrator',
@@ -208,10 +237,12 @@ export const AuthProvider = ({ children }) => {
         });
         return true;
       } else {
+        console.log("AuthContext: Login failed - not an admin");
         await signOut(auth);
         throw new Error("You do not have administrator privileges.");
       }
     } catch (error) {
+      console.error("AuthContext: Admin Login Error:", error);
       if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-email') {
         throw new Error("Invalid administrator credentials");
       }
