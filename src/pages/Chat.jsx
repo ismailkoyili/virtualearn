@@ -88,10 +88,16 @@ const Chat = () => {
         snapshot.forEach((doc) => {
           const data = doc.data();
           const chatId = data.chatId;
-          const msgTimestamp = data.timestamp?.toMillis ? data.timestamp.toMillis() : (data.timestamp instanceof Date ? data.timestamp.getTime() : 0);
-          const currentTimestamp = latest[chatId]?.timestamp?.toMillis ? latest[chatId].timestamp.toMillis() : (latest[chatId]?.timestamp instanceof Date ? latest[chatId].timestamp.getTime() : 0);
+          const getTime = (ts) => {
+            if (ts?.toMillis) return ts.toMillis();
+            if (ts instanceof Date) return ts.getTime();
+            return Date.now();
+          };
 
-          if (!latest[chatId] || msgTimestamp > currentTimestamp) {
+          const msgTimestamp = getTime(data.timestamp);
+          const currentTimestamp = getTime(latest[chatId]?.timestamp);
+
+          if (!latest[chatId] || msgTimestamp >= currentTimestamp) {
             latest[chatId] = {
               text: data.text || (data.type === 'image' ? '📷 Image' : data.type === 'video' ? '🎥 Video' : data.type === 'audio' ? '🎤 Audio' : '📎 Document'),
               timestamp: data.timestamp,
@@ -121,13 +127,16 @@ const Chat = () => {
 
     const chatId = getChatId(user.id, selectedUser.uid);
     const messagesRef = collection(db, 'messages');
+
+    // Removing orderBy('timestamp') to avoid dependency on composite indexes
+    // and to ensure messages with pending server timestamps (which are null)
+    // are not filtered out by Firestore's query engine.
     const q = query(
       messagesRef, 
-      where('chatId', '==', chatId),
-      orderBy('timestamp', 'asc')
+      where('chatId', '==', chatId)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
       const serverMsgs = [];
       snapshot.forEach((doc) => {
         serverMsgs.push({ id: doc.id, ...doc.data() });
@@ -140,14 +149,19 @@ const Chat = () => {
         );
 
         // Merge server messages with remaining optimistic ones
+        // We sort locally to handle null timestamps from pending writes
         return [...serverMsgs, ...optimistic].sort((a, b) => {
-          const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp instanceof Date ? a.timestamp.getTime() : 0);
-          const timeB = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp instanceof Date ? b.timestamp.getTime() : 0);
-          return timeA - timeB;
+          const getTime = (m) => {
+            if (m.timestamp?.toMillis) return m.timestamp.toMillis();
+            if (m.timestamp instanceof Date) return m.timestamp.getTime();
+            // If it's a pending server timestamp, put it at the end (newest)
+            return Date.now();
+          };
+          return getTime(a) - getTime(b);
         });
       });
     }, (error) => {
-      console.error("Error fetching messages:", error);
+      console.error("Firestore Snapshot Error:", error);
     });
 
     return () => unsubscribe();
