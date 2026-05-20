@@ -1,65 +1,46 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, AlertCircle, CheckCircle, User, Briefcase } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Signup = () => {
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState('student');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('Creating Account...');
-  const [showRedirectOption, setShowRedirectOption] = useState(false);
 
-  const { googleSignIn, completeRegistration } = useAuth();
-  const navigate = useNavigate();
+  const { register } = useAuth();
 
-  const handleSignup = async (e, method = 'popup') => {
-    if (e) e.preventDefault();
+  const handleSignup = async (e) => {
+    e.preventDefault();
+
     if (!name.trim()) {
-      setError("Please enter your full name.");
+      setError('Please enter your full name.');
+      return;
+    }
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!password.trim()) {
+      setError('Please enter a password.');
       return;
     }
 
     setError('');
     setIsLoading(true);
-    setLoadingText(method === 'popup' ? 'Opening Google Login...' : 'Redirecting to Google...');
-
-    let popupTimer;
-    if (method === 'popup') {
-      popupTimer = setTimeout(() => {
-        setLoadingText('Check for blocked popup...');
-        setShowRedirectOption(true);
-      }, 5000);
-    } else {
-      // Save state for when they come back
-      localStorage.setItem('pendingRegistration', JSON.stringify({ name, role }));
-    }
+    setLoadingText('Creating account...');
 
     try {
-      const result = await googleSignIn(method);
-      if (method === 'redirect') return; // Page will redirect
-
-      if (popupTimer) clearTimeout(popupTimer);
-      const { isNewUser, user, role: existingRole } = result;
-
-      if (!isNewUser) {
-        // User already has an account, ignore the form and just log them in
-        setLoadingText('Account found! Redirecting...');
-        setTimeout(() => {
-          navigate(existingRole === 'teacher' ? '/teacher-dashboard' : '/dashboard');
-        }, 1000);
-      } else {
-        // Complete registration with the info from the form
-        setLoadingText('Saving your profile...');
-        await completeRegistration(user.uid, name, user.email, role);
-        setSuccess(true);
-      }
+      await register(name, email, password, role);
+      setSuccess(true);
     } catch (err) {
-      clearTimeout(popupTimer);
-      setError(err.message || "Failed to create account.");
+      setError(err.message || 'Failed to create account.');
     } finally {
       setIsLoading(false);
       setLoadingText('Creating Account...');
@@ -157,6 +138,32 @@ const Signup = () => {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+                <input
+                  type="email"
+                  required
+                  disabled={isLoading}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="block w-full pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/60 backdrop-blur-sm transition-all outline-none"
+                  placeholder="you@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  disabled={isLoading}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="block w-full pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/60 backdrop-blur-sm transition-all outline-none"
+                  placeholder="Create a secure password"
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">I want to join as a:</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -185,21 +192,8 @@ const Signup = () => {
                   disabled={isLoading}
                   className="w-full flex items-center justify-center gap-3 py-3.5 px-4 border border-gray-200 rounded-xl shadow-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 transition-all border-b-4 active:border-b-0 active:translate-y-1"
                 >
-                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-                  {isLoading ? loadingText : 'Sign Up with Google'}
+                  {isLoading ? loadingText : 'Create Account'}
                 </motion.button>
-
-                {showRedirectOption && !success && (
-                  <motion.button
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    type="button"
-                    onClick={(e) => handleSignup(e, 'redirect')}
-                    className="w-full py-3 px-4 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 rounded-xl transition-all border border-blue-100"
-                  >
-                    Popup blocked? Try Redirect Method
-                  </motion.button>
-                )}
               </div>
 
               <p className="text-[11px] text-gray-500 text-center mt-4 px-4 leading-relaxed">

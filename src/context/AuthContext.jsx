@@ -2,11 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { auth, db } from '../firebase';
 import {
   onAuthStateChanged,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signOut,
+  createUserWithEmailAndPassword,
   signInWithEmailAndPassword
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, enableNetwork } from 'firebase/firestore';
@@ -39,74 +36,9 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Helper function to handle the user data fetching logic (reusable for popup and redirect)
-  const handleUserResult = useCallback(async (user) => {
-    try {
-      await enableNetwork(db).catch(() => {});
-
-      let userDoc = null;
-      let retries = 0;
-      const maxRetries = 2;
-
-      while (retries <= maxRetries) {
-        try {
-          const fetchPromise = getDoc(doc(db, 'users', user.uid));
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Database timeout")), 12000)
-          );
-
-          userDoc = await Promise.race([fetchPromise, timeoutPromise]);
-          break;
-        } catch (retryErr) {
-          retries++;
-          if (retries > maxRetries) throw retryErr;
-          await new Promise(resolve => setTimeout(resolve, 1500));
-        }
-      }
-
-      if (!userDoc || !userDoc.exists()) {
-        // Check for pending registration from redirect
-        const pending = localStorage.getItem('pendingRegistration');
-        if (pending) {
-          const { name, role } = JSON.parse(pending);
-          localStorage.removeItem('pendingRegistration');
-          await completeRegistration(user.uid, name, user.email, role);
-          return { isNewUser: true, user, registrationCompleted: true };
-        }
-        return { isNewUser: true, user };
-      }
-
-      const userData = userDoc.data();
-      if ((userData.status === 'pending' || userData.status === 'Waiting for Admin Approval') && user.email !== 'ismadl@edu') {
-        await signOut(auth);
-        throw new Error("Your account is pending admin approval.");
-      }
-
-      return { isNewUser: false, role: userData.role };
-    } catch (dbError) {
-      console.warn("AuthContext: Firestore check failed.", dbError);
-      if (user.email === 'ismadl@edu') {
-        return { isNewUser: false, role: 'admin' };
-      }
-      throw new Error(dbError.message || "Connection unstable. Please check your internet and try again.");
-    }
-  }, [completeRegistration]);
-
   useEffect(() => {
     // Explicitly enable network on load to prevent "offline" states
     enableNetwork(db).catch(err => console.error("Firestore: Could not enable network", err));
-
-    // Handle Redirect Result
-    getRedirectResult(auth).then(async (result) => {
-      if (result) {
-        try {
-          await handleUserResult(result.user);
-          // The onAuthStateChanged will handle the state update
-        } catch (error) {
-          console.error("Redirect Result Error:", error);
-        }
-      }
-    }).catch(err => console.error("Redirect Error:", err));
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
@@ -168,33 +100,54 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => unsubscribe();
-  }, [handleUserResult]);
+  }, []);
 
-  const googleSignIn = async (method = 'popup') => {
-    const provider = new GoogleAuthProvider();
-    // Force select account to prevent silent failures
-    provider.setCustomParameters({ prompt: 'select_account' });
-
+  const register = async (name, email, password, role) => {
     try {
-      if (method === 'redirect') {
-        await signInWithRedirect(auth, provider);
-        return; // Execution stops here as page redirects
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await completeRegistration(userCredential.user.uid, name, email, role);
+      return true;
+    } catch (error) {
+      console.error("Registration Error:", error);
+      if (error.code === 'auth/email-already-in-use') {
+        throw new Error("This email is already registered. Please log in instead.");
+      }
+      if (error.code === 'auth/invalid-email') {
+        throw new Error("Please enter a valid email address.");
+      }
+      if (error.code === 'auth/weak-password') {
+        throw new Error("Password should be at least 6 characters.");
+      }
+      throw new Error(error.message || "Failed to create account.");
+    }
+  };
+
+  const login = async (email, password) => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+
+      if (!userDoc.exists()) {
+        await signOut(auth);
+        throw new Error("Account not found. Please sign up first.");
       }
 
-      const result = await signInWithPopup(auth, provider);
-      return await handleUserResult(result.user);
+      const userData = userDoc.data();
+      if (userData.status === 'pending' || userData.status === 'Waiting for Admin Approval') {
+        await signOut(auth);
+        throw new Error("Your account is pending admin approval.");
+      }
+
+      return { role: userData.role, name: userData.name };
     } catch (error) {
-      console.error("Google Sign-In Error:", error);
-      if (error.code === 'auth/popup-blocked') {
-        throw new Error("Sign-in popup was blocked by your browser. Please allow popups for this site or use the redirect option.");
+      console.error("Login Error:", error);
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        throw new Error("Invalid email or password.");
       }
-      if (error.code === 'auth/network-request-failed') {
-        throw new Error("Network error. Please check your internet connection.");
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-email') {
+        throw new Error("Invalid email or password.");
       }
-      if (error.code === 'auth/popup-closed-by-user') {
-        throw new Error("Sign-in window was closed. Please try again.");
-      }
-      throw new Error(error.message || "Failed to sign in with Google.");
+      throw new Error(error.message || "Failed to sign in.");
     }
   };
 
@@ -244,7 +197,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, googleSignIn, completeRegistration, adminLogin, logout }}>
+    <AuthContext.Provider value={{ user, register, login, adminLogin, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );

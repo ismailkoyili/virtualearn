@@ -5,43 +5,36 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('Connecting...');
-  const [showRedirectOption, setShowRedirectOption] = useState(false);
-  const { googleSignIn } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleGoogleLogin = async (method = 'popup') => {
+  const handleLogin = async (e) => {
+    e.preventDefault();
     setError('');
     setIsLoading(true);
-    setLoadingText(method === 'popup' ? 'Connecting...' : 'Redirecting...');
 
-    let popupTimer;
-    if (method === 'popup') {
-      popupTimer = setTimeout(() => {
-        setLoadingText('Check for blocked popup...');
-        setShowRedirectOption(true);
-      }, 5000);
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      setIsLoading(false);
+      return;
+    }
+    if (!password.trim()) {
+      setError('Please enter your password.');
+      setIsLoading(false);
+      return;
     }
 
     try {
-      const result = await googleSignIn(method);
-      if (method === 'redirect') return;
-
-      if (popupTimer) clearTimeout(popupTimer);
-      const { isNewUser, role } = result;
-
-      if (isNewUser) {
-        // Redirect to signup because they haven't created an account yet
-        setError("Account not found. Please create an account first.");
-        setTimeout(() => navigate('/signup'), 2500);
-      } else if (role === 'teacher') {
+      const result = await login(email, password);
+      if (result.role === 'teacher') {
         navigate('/teacher-dashboard');
-      } else if (role === 'student') {
-        navigate('/dashboard');
       } else {
-        setError("Account status unknown. Please contact support.");
+        navigate('/dashboard');
       }
     } catch (err) {
       setError(err.message);
@@ -99,34 +92,42 @@ const Login = () => {
             </motion.div>
           )}
 
-          <div className="space-y-6">
-            <p className="text-sm text-gray-600 text-center mb-4">
-              Access the Student or Teacher portal using your authorized Google account.
-            </p>
-
-            <div className="space-y-3">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleGoogleLogin('popup')}
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+              <input
+                type="email"
+                required
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-200 rounded-xl shadow-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 transition-all"
-              >
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-                {isLoading ? loadingText : 'Sign in with Google'}
-              </motion.button>
-
-              {showRedirectOption && (
-                <motion.button
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  onClick={() => handleGoogleLogin('redirect')}
-                  className="w-full py-2.5 px-4 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 rounded-xl transition-all border border-blue-100"
-                >
-                  Popup blocked? Try Redirect Method
-                </motion.button>
-              )}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="block w-full pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/60 backdrop-blur-sm transition-all outline-none"
+                placeholder="you@example.com"
+              />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <input
+                type="password"
+                required
+                disabled={isLoading}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="block w-full pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/60 backdrop-blur-sm transition-all outline-none"
+                placeholder="Enter your password"
+              />
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center py-3 px-4 border border-gray-200 rounded-xl shadow-md text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 transition-all"
+            >
+              {isLoading ? loadingText : 'Sign in'}
+            </motion.button>
 
             <div className="relative my-8">
               <div className="absolute inset-0 flex items-center">
@@ -143,7 +144,7 @@ const Login = () => {
             >
               Create an Account
             </Link>
-          </div>
+          </form>
 
           <div className="mt-8 pt-6 border-t border-gray-200/50 text-center">
             <Link
