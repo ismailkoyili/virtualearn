@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { doc, onSnapshot, setDoc, updateDoc, collection, addDoc, getDocs, deleteDoc } from 'firebase/firestore';
-import { ArrowLeft, Monitor, PenTool, VideoOff, Video as VideoIcon, Users } from 'lucide-react';
+import { ArrowLeft, Monitor, PenTool, VideoOff, Video as VideoIcon, Users, Mic, MicOff, PhoneOff } from 'lucide-react';
 
 // Components
 import Whiteboard from '../components/live-class/Whiteboard';
@@ -20,16 +20,20 @@ const LiveClass = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('whiteboard'); // 'whiteboard', 'screen', or 'video'
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isVideoSharing, setIsVideoSharing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('waiting');
   const [roomId, setRoomId] = useState(null);
   const [isLive, setIsLive] = useState(false);
   
+  // Media States
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isVideoOn, setIsVideoOn] = useState(false);
+  const [isMicOn, setIsMicOn] = useState(false);
+  
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+  
   const peerConnection = useRef(null);
-  const localStream = useRef(null);
 
   useEffect(() => {
     if (!user) {
@@ -52,7 +56,7 @@ const LiveClass = () => {
     
     const roomRef = doc(db, 'liveRooms', roomId);
     if (user.role === 'teacher') {
-      setDoc(roomRef, { isLive: true }, { merge: true });
+      setDoc(roomRef, { isLive: true, activeStream: 'whiteboard' }, { merge: true });
       setIsLive(true);
       
       const handleUnload = () => {
@@ -70,18 +74,9 @@ const LiveClass = () => {
           const data = docSnap.data();
           setIsLive(!!data.isLive);
           if (data.activeStream) {
-            setActiveTab(data.activeStream);
-            if (data.activeStream === 'screen') {
-               setIsScreenSharing(true);
-               setIsVideoSharing(false);
-            } else if (data.activeStream === 'video') {
-               setIsVideoSharing(true);
-               setIsScreenSharing(false);
-            }
+             setActiveTab(data.activeStream);
           } else {
-            setIsScreenSharing(false);
-            setIsVideoSharing(false);
-            setActiveTab('whiteboard');
+             setActiveTab('whiteboard');
           }
         } else {
           setIsLive(false);
@@ -93,39 +88,52 @@ const LiveClass = () => {
 
   // Handle WebRTC Setup based on Role
   useEffect(() => {
-    if (!roomId || !user) return;
+    if (!roomId || !user || !isLive) return;
     
-    peerConnection.current = new RTCPeerConnection(configuration);
+    if (!peerConnection.current) {
+        peerConnection.current = new RTCPeerConnection(configuration);
+        
+        // Add transceivers upfront to avoid renegotiation
+        peerConnection.current.addTransceiver('audio', { direction: 'sendrecv' });
+        peerConnection.current.addTransceiver('video', { direction: 'sendrecv' });
 
-    peerConnection.current.addEventListener('iceconnectionstatechange', () => {
-      console.log('ICE state:', peerConnection.current?.iceConnectionState);
-      if (peerConnection.current?.iceConnectionState === 'connected') {
-        setConnectionStatus('connected');
-      } else if (peerConnection.current?.iceConnectionState === 'disconnected' || peerConnection.current?.iceConnectionState === 'failed') {
-        setConnectionStatus('waiting');
-      }
-    });
+        peerConnection.current.addEventListener('iceconnectionstatechange', () => {
+          console.log('ICE state:', peerConnection.current?.iceConnectionState);
+          if (peerConnection.current?.iceConnectionState === 'connected') {
+            setConnectionStatus('connected');
+          } else if (peerConnection.current?.iceConnectionState === 'disconnected' || peerConnection.current?.iceConnectionState === 'failed') {
+            setConnectionStatus('waiting');
+          }
+        });
+        
+        peerConnection.current.addEventListener('track', (event) => {
+            console.log('Got remote track:', event.track.kind);
+            if (event.track.kind === 'video' && remoteVideoRef.current) {
+                // If it's a new stream, assign it
+                if (remoteVideoRef.current.srcObject !== event.streams[0]) {
+                    remoteVideoRef.current.srcObject = event.streams[0];
+                }
+            } else if (event.track.kind === 'audio' && remoteAudioRef.current) {
+                if (remoteAudioRef.current.srcObject !== event.streams[0]) {
+                    remoteAudioRef.current.srcObject = event.streams[0];
+                }
+            }
+        });
 
-    if (user.role === 'student') {
-      peerConnection.current.addEventListener('track', async (event) => {
-        console.log('Got remote track:', event.streams[0]);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
+        if (user.role === 'teacher') {
+          createRoom();
+        } else if (user.role === 'student') {
+          joinRoomById(roomId);
         }
-      });
-      
-      joinRoomById(roomId);
     }
 
     return () => {
       if (peerConnection.current) {
         peerConnection.current.close();
-      }
-      if (localStream.current) {
-        localStream.current.getTracks().forEach(track => track.stop());
+        peerConnection.current = null;
       }
     };
-  }, [roomId, user]);
+  }, [roomId, user, isLive]);
 
   const clearCandidates = async () => {
     if (!roomId) return;
@@ -140,91 +148,165 @@ const LiveClass = () => {
     calleeSnap.forEach(d => deleteDoc(d.ref));
   };
 
-  const stopMediaShare = async () => {
-    if (localStream.current) {
-      localStream.current.getTracks().forEach(track => track.stop());
-      localStream.current = null;
-    }
-    
-    if (peerConnection.current) {
-      peerConnection.current.getSenders().forEach(sender => {
-        peerConnection.current.removeTrack(sender);
-      });
-    }
-    
-    setIsScreenSharing(false);
-    setIsVideoSharing(false);
-    setActiveTab('whiteboard');
-    
-    if (roomId && user?.role === 'teacher') {
-      const roomRef = doc(db, 'liveRooms', roomId);
-      await updateDoc(roomRef, { offer: null, answer: null, activeStream: null });
-      await clearCandidates();
-    }
+  const endClass = async () => {
+      if (window.confirm("Are you sure you want to end the live class?")) {
+          // Stop all local tracks
+          if (localVideoRef.current && localVideoRef.current.srcObject) {
+              localVideoRef.current.srcObject.getTracks().forEach(track => track.stop());
+          }
+          
+          if (peerConnection.current) {
+            peerConnection.current.close();
+            peerConnection.current = null;
+          }
+          
+          if (roomId) {
+            const roomRef = doc(db, 'liveRooms', roomId);
+            await updateDoc(roomRef, { isLive: false, activeStream: null, offer: null, answer: null });
+            await clearCandidates();
+          }
+          navigate('/teacher-dashboard');
+      }
+  };
+
+  // Helper to replace track in transceiver
+  const replaceTrack = (kind, newTrack) => {
+      if (!peerConnection.current) return;
+      const transceiver = peerConnection.current.getTransceivers().find(t => t.receiver.track.kind === kind);
+      if (transceiver && transceiver.sender) {
+          transceiver.sender.replaceTrack(newTrack);
+      }
+  };
+
+  // Helper to get local stream from video ref
+  const getLocalStream = () => {
+      if (!localVideoRef.current) return null;
+      return localVideoRef.current.srcObject;
+  };
+
+  // Helper to create or get local stream
+  const getOrCreateLocalStream = () => {
+      if (localVideoRef.current && localVideoRef.current.srcObject) {
+          return localVideoRef.current.srcObject;
+      }
+      const stream = new MediaStream();
+      if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+      }
+      return stream;
+  };
+
+  const stopVideoAndScreen = () => {
+      const stream = getLocalStream();
+      if (stream) {
+          stream.getVideoTracks().forEach(track => {
+              track.stop();
+              stream.removeTrack(track);
+          });
+      }
+      replaceTrack('video', null);
+      setIsVideoOn(false);
+      setIsScreenSharing(false);
+      
+      if (user.role === 'teacher') {
+          setActiveTab('whiteboard');
+          updateDoc(doc(db, 'liveRooms', roomId), { activeStream: 'whiteboard' });
+      }
+  };
+
+  const toggleMic = async () => {
+      if (isMicOn) {
+          // Turn off
+          const stream = getLocalStream();
+          if (stream) {
+              stream.getAudioTracks().forEach(track => {
+                  track.stop();
+                  stream.removeTrack(track);
+              });
+          }
+          replaceTrack('audio', null);
+          setIsMicOn(false);
+      } else {
+          // Turn on
+          try {
+              const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              const audioTrack = audioStream.getAudioTracks()[0];
+              const stream = getOrCreateLocalStream();
+              stream.addTrack(audioTrack);
+              replaceTrack('audio', audioTrack);
+              setIsMicOn(true);
+          } catch (err) {
+              console.error("Error accessing microphone", err);
+              alert("Could not access microphone.");
+          }
+      }
+  };
+
+  const toggleVideo = async () => {
+      if (isVideoOn) {
+          stopVideoAndScreen();
+      } else {
+          try {
+              stopVideoAndScreen(); // clean up any existing screen share
+              const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+              const videoTrack = videoStream.getVideoTracks()[0];
+              
+              const stream = getOrCreateLocalStream();
+              stream.addTrack(videoTrack);
+              replaceTrack('video', videoTrack);
+              
+              setIsVideoOn(true);
+              setIsScreenSharing(false);
+              
+              if (user.role === 'teacher') {
+                  setActiveTab('video');
+                  updateDoc(doc(db, 'liveRooms', roomId), { activeStream: 'video' });
+              }
+              
+              videoTrack.onended = () => {
+                  stopVideoAndScreen();
+              };
+          } catch (err) {
+              console.error("Error accessing camera", err);
+              alert("Could not access camera.");
+          }
+      }
   };
 
   const startScreenShare = async () => {
-    try {
-      await stopMediaShare(); // stop any existing
-      
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      localStream.current = stream;
-      
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-      
-      stream.getTracks().forEach(track => {
-        peerConnection.current.addTrack(track, stream);
-      });
-      
-      stream.getVideoTracks()[0].onended = () => {
-        stopMediaShare();
-      };
-      
-      setIsScreenSharing(true);
-      setActiveTab('screen');
-      createRoom('screen');
-      
-    } catch (error) {
-      console.error("Error accessing display media.", error);
-      if (error.name !== 'NotAllowedError') {
-         alert("Could not start screen share. Please ensure you granted permissions.");
-      }
-    }
-  };
-
-  const startVideoShare = async () => {
-    try {
-      await stopMediaShare(); // stop any existing
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localStream.current = stream;
-      
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-      
-      stream.getTracks().forEach(track => {
-        peerConnection.current.addTrack(track, stream);
-      });
-      
-      stream.getVideoTracks()[0].onended = () => {
-        stopMediaShare();
-      };
-      
-      setIsVideoSharing(true);
-      setActiveTab('video');
-      createRoom('video');
-      
-    } catch (error) {
-      console.error("Error accessing camera media.", error);
-      alert("Could not start video share. Please ensure you granted camera permissions.");
+    if (user.role !== 'teacher') return;
+    
+    if (isScreenSharing) {
+        stopVideoAndScreen();
+    } else {
+        try {
+            stopVideoAndScreen(); // stop any existing video
+            const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const videoTrack = screenStream.getVideoTracks()[0];
+            
+            const stream = getOrCreateLocalStream();
+            stream.addTrack(videoTrack);
+            replaceTrack('video', videoTrack);
+            
+            setIsScreenSharing(true);
+            setIsVideoOn(false);
+            setActiveTab('screen');
+            updateDoc(doc(db, 'liveRooms', roomId), { activeStream: 'screen' });
+            
+            videoTrack.onended = () => {
+                stopVideoAndScreen();
+            };
+        } catch (err) {
+            console.error("Error accessing screen", err);
+            if (err.name !== 'NotAllowedError') {
+                alert("Could not start screen share.");
+            }
+        }
     }
   };
 
   // WebRTC Signaling: Create Offer (Teacher)
-  const createRoom = async (streamType) => {
+  const createRoom = async () => {
     if (!roomId) return;
     setConnectionStatus('connecting');
     const roomRef = doc(db, 'liveRooms', roomId);
@@ -234,7 +316,6 @@ const LiveClass = () => {
 
     peerConnection.current.onicecandidate = event => {
       if (!event.candidate) {
-        console.log('Got final candidate!');
         return;
       }
       addDoc(callerCandidatesCollection, event.candidate.toJSON());
@@ -243,20 +324,12 @@ const LiveClass = () => {
     const offer = await peerConnection.current.createOffer();
     await peerConnection.current.setLocalDescription(offer);
 
-    const roomWithOffer = {
-      offer: {
-        type: offer.type,
-        sdp: offer.sdp,
-      },
-      activeStream: streamType
-    };
-    await setDoc(roomRef, roomWithOffer, { merge: true });
+    await setDoc(roomRef, { offer: { type: offer.type, sdp: offer.sdp } }, { merge: true });
 
     // Listen for remote answer
     onSnapshot(roomRef, async snapshot => {
       const data = snapshot.data();
       if (peerConnection.current && !peerConnection.current.currentRemoteDescription && data && data.answer) {
-        console.log('Got remote description: ', data.answer);
         try {
           const rtcSessionDescription = new RTCSessionDescription(data.answer);
           await peerConnection.current.setRemoteDescription(rtcSessionDescription);
@@ -289,7 +362,6 @@ const LiveClass = () => {
     onSnapshot(roomRef, async snapshot => {
       const data = snapshot.data();
       if (data && data.offer) {
-        console.log('Got offer:', data.offer);
         // Ensure signaling state allows setting remote description
         if (peerConnection.current && (peerConnection.current.signalingState === "stable" || peerConnection.current.signalingState === "have-local-offer")) {
             const callerCandidatesCollection = collection(roomRef, 'callerCandidates');
@@ -307,13 +379,7 @@ const LiveClass = () => {
               const answer = await peerConnection.current.createAnswer();
               await peerConnection.current.setLocalDescription(answer);
 
-              const roomWithAnswer = {
-                answer: {
-                    type: answer.type,
-                    sdp: answer.sdp,
-                },
-              };
-              await updateDoc(roomRef, roomWithAnswer);
+              await updateDoc(roomRef, { answer: { type: answer.type, sdp: answer.sdp } });
 
               onSnapshot(callerCandidatesCollection, snapshot => {
                 snapshot.docChanges().forEach(async change => {
@@ -365,6 +431,9 @@ const LiveClass = () => {
 
   return (
     <div className="h-screen bg-[#f0f2f5] flex flex-col font-sans overflow-hidden">
+      {/* Hidden audio element to play remote audio */}
+      <audio ref={remoteAudioRef} autoPlay />
+
       {/* Top Navigation */}
       <nav className="bg-gray-900 px-4 py-3 shadow-lg shrink-0 text-white flex items-center justify-between h-[60px] sm:h-[70px] z-20">
         <div className="flex items-center">
@@ -382,30 +451,56 @@ const LiveClass = () => {
         </div>
         
         <div className="flex items-center gap-3">
+          {/* Audio/Video Controls for ALL users */}
+          <button
+            onClick={toggleMic}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm ${
+              isMicOn 
+                ? 'bg-red-500 hover:bg-red-600 text-white' 
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
+            }`}
+            title={isMicOn ? "Mute Microphone" : "Unmute Microphone"}
+          >
+            {isMicOn ? <MicOff size={18} /> : <Mic size={18} />}
+            <span className="hidden sm:block">{isMicOn ? 'Mute' : 'Unmute'}</span>
+          </button>
+
+          <button
+            onClick={toggleVideo}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm ${
+              isVideoOn 
+                ? 'bg-red-500 hover:bg-red-600 text-white' 
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
+            }`}
+            title={isVideoOn ? "Stop Camera" : "Share Camera"}
+          >
+            {isVideoOn ? <VideoOff size={18} /> : <VideoIcon size={18} />}
+            <span className="hidden sm:block">{isVideoOn ? 'Stop Video' : 'Share Video'}</span>
+          </button>
+
+          {/* Teacher Only Controls */}
           {user.role === 'teacher' && (
             <>
               <button
-                onClick={isVideoSharing ? stopMediaShare : startVideoShare}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm ${
-                  isVideoSharing 
-                    ? 'bg-red-500 hover:bg-red-600 text-white' 
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-              >
-                {isVideoSharing ? <VideoOff size={18} /> : <VideoIcon size={18} />}
-                <span className="hidden sm:block">{isVideoSharing ? 'Stop Video' : 'Share Video'}</span>
-              </button>
-
-              <button
-                onClick={isScreenSharing ? stopMediaShare : startScreenShare}
+                onClick={startScreenShare}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm ${
                   isScreenSharing 
                     ? 'bg-red-500 hover:bg-red-600 text-white' 
                     : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                 }`}
+                title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}
               >
                 {isScreenSharing ? <VideoOff size={18} /> : <Monitor size={18} />}
                 <span className="hidden sm:block">{isScreenSharing ? 'Stop Screen' : 'Share Screen'}</span>
+              </button>
+
+              <button
+                onClick={endClass}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all shadow-sm bg-red-600 hover:bg-red-700 text-white ml-2"
+                title="End Live Class completely"
+              >
+                <PhoneOff size={18} />
+                <span className="hidden sm:block">End Class</span>
               </button>
             </>
           )}
@@ -423,7 +518,7 @@ const LiveClass = () => {
         {/* Left Side: Presentation Area */}
         <div className="flex-1 flex flex-col bg-gray-800 relative z-10 p-2 md:p-4 transition-all">
           
-          {/* Tabs for switching between Screen and Whiteboard */}
+          {/* Tabs for switching between Screen and Whiteboard (Teacher only, Student follows) */}
           <div className="flex items-center gap-2 mb-3 px-2">
             <button 
               onClick={() => user.role === 'teacher' && setActiveTab('whiteboard')}
@@ -449,7 +544,7 @@ const LiveClass = () => {
               </button>
             )}
 
-            {(activeTab === 'video' || isVideoSharing) && (
+            {(activeTab === 'video' || (user.role === 'teacher' && isVideoOn)) && (
               <button 
                 onClick={() => user.role === 'teacher' && setActiveTab('video')}
                 disabled={user.role !== 'teacher'}
@@ -458,7 +553,7 @@ const LiveClass = () => {
                 } ${user.role !== 'teacher' && 'cursor-default'}`}
               >
                 <VideoIcon size={16} />
-                Video {isVideoSharing && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse ml-1"></span>}
+                Teacher Video {(user.role === 'teacher' && isVideoOn) && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse ml-1"></span>}
               </button>
             )}
           </div>
@@ -471,14 +566,12 @@ const LiveClass = () => {
               <Whiteboard roomId={roomId} userRole={user.role} />
             </div>
 
-            {/* Media (Screen/Video) Layer */}
+            {/* Media (Screen/Video) Layer - Main View */}
             <div className={`absolute inset-0 z-10 bg-gray-900 flex items-center justify-center ${activeTab === 'screen' || activeTab === 'video' ? 'block' : 'hidden'}`}>
-              {!(isScreenSharing || isVideoSharing) ? (
-                <div className="flex flex-col items-center justify-center text-gray-500 gap-4">
-                  <Monitor size={48} className="opacity-20" />
-                  <p className="font-medium text-lg">No active media share.</p>
-                </div>
-              ) : (
+                {/* 
+                  If user is teacher, they see their own screen/video in the main view (localVideoRef).
+                  If user is student, they see the teacher's screen/video in the main view (remoteVideoRef).
+                */}
                 <video 
                   ref={user.role === 'teacher' ? localVideoRef : remoteVideoRef}
                   autoPlay 
@@ -486,13 +579,30 @@ const LiveClass = () => {
                   muted={user.role === 'teacher'} // Mute local echo
                   className="w-full h-full object-contain bg-black"
                 />
-              )}
             </div>
             
+            {/* Picture-in-Picture (PiP) View */}
+            {/* 
+               If user is teacher, PiP shows the student's video (remoteVideoRef).
+               If user is student, PiP shows their own video (localVideoRef).
+            */}
+            <div className="absolute bottom-4 right-4 z-30 w-32 md:w-48 aspect-video bg-gray-800 border-2 border-gray-600 rounded-lg overflow-hidden shadow-xl shadow-black/50">
+                <video 
+                  ref={user.role === 'teacher' ? remoteVideoRef : localVideoRef}
+                  autoPlay 
+                  playsInline 
+                  muted={user.role === 'student'} // Student mutes their own preview
+                  className="w-full h-full object-cover bg-gray-900"
+                />
+                <div className="absolute bottom-1 left-2 text-[10px] font-semibold text-white/80 bg-black/50 px-1.5 py-0.5 rounded backdrop-blur-sm">
+                    {user.role === 'teacher' ? 'Student' : 'You'}
+                </div>
+            </div>
+
           </div>
           
-          {user.role === 'teacher' && connectionStatus !== 'connected' && (isScreenSharing || isVideoSharing) && (
-             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/80 backdrop-blur-md border border-gray-700 text-gray-300 px-4 py-2 rounded-full text-sm flex items-center gap-2 z-30">
+          {user.role === 'teacher' && connectionStatus !== 'connected' && (isScreenSharing || isVideoOn) && (
+             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/80 backdrop-blur-md border border-gray-700 text-gray-300 px-4 py-2 rounded-full text-sm flex items-center gap-2 z-40">
                <div className="w-4 h-4 rounded-full border-2 border-gray-400 border-t-transparent animate-spin"></div>
                Waiting for student to join stream...
              </div>
