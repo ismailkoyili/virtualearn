@@ -133,7 +133,7 @@ const AttendanceCalendar = ({ attendanceRecords = [] }) => {
                   <div className="flex flex-col items-center justify-center flex-1 w-full gap-0.5 mt-1">
                     <CheckCircle size={14} className="text-green-500" />
                     {timeStr && (
-                      <span className="text-[10px] font-semibold text-green-700 bg-green-100/80 px-1.5 py-0.5 rounded text-center leading-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+                      <span className="text-[8px] sm:text-[10px] font-semibold text-green-700 bg-green-100/80 px-0.5 sm:px-1.5 py-0.5 rounded text-center leading-none sm:leading-tight w-full break-words max-w-full">
                         {timeStr}
                       </span>
                     )}
