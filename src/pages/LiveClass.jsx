@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { doc, onSnapshot, setDoc, updateDoc, collection, addDoc, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, getDoc } from 'firebase/firestore';
 import { ArrowLeft, Monitor, PenTool, VideoOff, Video as VideoIcon, Users, Mic, MicOff, PhoneOff, Settings, AlertCircle } from 'lucide-react';
 
 // Components
@@ -270,11 +270,11 @@ const LiveClass = () => {
     };
 
     // Get Offer
-    const roomSnap = await getDocs(collection(db, 'liveRooms'));
+    const roomSnap = await getDoc(roomRef);
     let offer = null;
-    roomSnap.forEach(doc => {
-        if (doc.id === roomId) offer = doc.data().offer;
-    });
+    if (roomSnap.exists()) {
+        offer = roomSnap.data().offer;
+    }
 
     if (offer) {
         try {
@@ -301,7 +301,8 @@ const LiveClass = () => {
             });
         } catch (err) {
             console.error("Error answering call", err);
-            setError("Failed to connect to class.");
+            setError("Failed to connect to class: " + err.message);
+            setSessionState('PRE_JOIN');
         }
     } else {
         setError("Teacher offer not found. They may have disconnected.");
