@@ -13,6 +13,7 @@ const Chat = lazy(() => import('./pages/Chat'));
 const TeacherDashboard = lazy(() => import('./pages/TeacherDashboard'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const LiveClass = lazy(() => import('./pages/LiveClass'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -96,6 +97,7 @@ function App() {
               <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
               <Route path="/admin-login" element={<AdminLogin />} />
               <Route path="/admin-dashboard" element={<AdminDashboard />} />
+              <Route path="/live-class" element={<ErrorBoundary><LiveClass /></ErrorBoundary>} />
             </Routes>
           </Suspense>
         </Router>

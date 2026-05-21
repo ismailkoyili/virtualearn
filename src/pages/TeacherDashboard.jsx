@@ -101,7 +101,7 @@ const TeacherDashboard = () => {
           </div>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => window.open('https://meet.google.com/', '_blank')}
+              onClick={() => navigate('/live-class')}
               className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors px-4 py-2 rounded-full font-medium"
             >
               <Video size={18} />

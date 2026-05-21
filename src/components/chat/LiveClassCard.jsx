@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import { Video, Calendar, Clock, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const LiveClassCard = ({ message, isMe, userRole }) => {
+  const navigate = useNavigate();
   const { topic, scheduledTime, duration } = message.classDetails || {};
   
   // Format the date
@@ -14,11 +16,7 @@ const LiveClassCard = ({ message, isMe, userRole }) => {
   }, [scheduledTime]);
 
   const handleJoin = () => {
-    let link = message.classDetails?.meetLink || 'meet.google.com/ktq-tdeo-tsy';
-    if (!link.startsWith('http://') && !link.startsWith('https://')) {
-      link = 'https://' + link;
-    }
-    window.open(link, '_blank');
+    navigate('/live-class');
   };
 
   return (
