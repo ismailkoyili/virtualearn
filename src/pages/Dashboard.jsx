@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
+import AttendanceCalendar from '../components/dashboard/AttendanceCalendar';
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -140,10 +141,11 @@ const Dashboard = () => {
           <p className="text-gray-600 mt-2">Manage your daily attendance from this portal.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Mark Attendance Section */}
-          <div className="lg:col-span-1">
+          {/* Left Column: Actions & History */}
+          <div className="lg:col-span-4 flex flex-col gap-8">
+            {/* Mark Attendance Section */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -184,59 +186,59 @@ const Dashboard = () => {
                 <p>Attendance can only be marked once per day. It cannot be edited, updated, or deleted after submission.</p>
               </div>
             </motion.div>
-          </div>
 
-          {/* Attendance History */}
-          <div className="lg:col-span-2">
+            {/* Attendance History */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden h-full flex flex-col"
+              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col max-h-[400px]"
             >
               <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
                 <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                   <Clock size={20} className="text-gray-500" />
-                  Attendance History
+                  Recent History
                 </h3>
               </div>
               
-              <div className="p-6 flex-1 overflow-auto">
+              <div className="p-4 flex-1 overflow-auto">
                 {loadingAttendance ? (
                   <div className="flex justify-center items-center h-48">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
                 ) : attendanceRecords.length === 0 ? (
-                  <div className="flex flex-col justify-center items-center h-48 text-gray-500">
-                    <Calendar size={48} className="text-gray-300 mb-4" />
-                    <p>No attendance records found.</p>
+                  <div className="flex flex-col justify-center items-center h-32 text-gray-500 text-sm">
+                    <Calendar size={32} className="text-gray-300 mb-2" />
+                    <p>No attendance records.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {attendanceRecords.map((record) => (
-                      <div key={record.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors">
-                        <div className="flex items-center gap-4">
-                          <div className={`p-2 rounded-lg ${record.dateStr === todayStr ? 'bg-green-100 text-green-600' : 'bg-blue-50 text-blue-500'}`}>
-                            <CheckCircle size={20} />
+                  <div className="space-y-3">
+                    {attendanceRecords.slice(0, 5).map((record) => (
+                      <div key={record.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-1.5 rounded-lg ${record.dateStr === todayStr ? 'bg-green-100 text-green-600' : 'bg-blue-50 text-blue-500'}`}>
+                            <CheckCircle size={16} />
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900">
-                              {new Date(record.dateStr).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })}
+                            <p className="font-medium text-gray-900 text-sm">
+                              {new Date(record.dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                             </p>
                             <p className="text-xs text-gray-500">
-                              Marked at: {new Date(record.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(record.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                             </p>
                           </div>
                         </div>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Present
-                        </span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
             </motion.div>
+          </div>
+
+          {/* Right Column: Attendance Calendar */}
+          <div className="lg:col-span-8 h-full">
+            <AttendanceCalendar attendanceRecords={attendanceRecords} />
           </div>
           
         </div>
