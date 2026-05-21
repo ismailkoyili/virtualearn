@@ -45,7 +45,19 @@ const Chat = () => {
       snapshot.forEach((doc) => {
         const data = doc.data();
         if (data.uid !== user.id && data.status !== 'pending' && data.status !== 'Waiting for Admin Approval') {
-          usersList.push(data);
+          if (user.role === 'student') {
+            if (data.role === 'teacher' && data.uid === user.assignedTeacherId) {
+              usersList.push(data);
+            }
+          } else if (user.role === 'teacher') {
+            const isStudent = data.role === 'student' || !data.role;
+            if (isStudent && data.assignedTeacherId === user.id) {
+              usersList.push(data);
+            }
+          } else {
+            // Admins or other roles can see everyone
+            usersList.push(data);
+          }
         }
       });
       setUsers(usersList);

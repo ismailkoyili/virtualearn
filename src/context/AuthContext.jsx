@@ -156,7 +156,8 @@ export const AuthProvider = ({ children }) => {
               name: userData.name || currentUser.displayName,
               email: currentUser.email,
               role: userData.role || 'student',
-              status: userData.status || 'Waiting for Admin Approval'
+              status: userData.status || 'Waiting for Admin Approval',
+              assignedTeacherId: userData.assignedTeacherId || null
             });
           } else {
             console.log("AuthContext: No user document exists");
