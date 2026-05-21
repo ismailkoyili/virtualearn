@@ -223,6 +223,8 @@ const LiveClass = () => {
       answer: null
     });
 
+    setSessionState('CONNECTED');
+
     // Listen for remote answer
     onSnapshot(roomRef, async snapshot => {
       const data = snapshot.data();
@@ -281,6 +283,8 @@ const LiveClass = () => {
             await peerConnection.current.setLocalDescription(answer);
 
             await updateDoc(roomRef, { answer: { type: answer.type, sdp: answer.sdp } });
+            
+            setSessionState('CONNECTED');
 
             // Listen for remote ICE candidates
             onSnapshot(callerCandidatesCollection, snapshot => {
