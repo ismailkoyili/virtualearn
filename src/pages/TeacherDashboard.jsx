@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut, User, Users, UserPlus, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react';
+import { LogOut, User, Users, UserPlus, CheckCircle, AlertCircle, MessageSquare, Video } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
@@ -100,6 +100,13 @@ const TeacherDashboard = () => {
             <span className="font-bold text-xl text-gray-800 ml-2 hidden sm:block">Teacher Portal</span>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.open('https://meet.google.com/', '_blank')}
+              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors px-4 py-2 rounded-full font-medium"
+            >
+              <Video size={18} />
+              <span className="hidden sm:block">Live Class</span>
+            </button>
             <button
               onClick={() => navigate('/chat')}
               className="flex items-center gap-2 text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 transition-colors px-4 py-2 rounded-full font-medium"
