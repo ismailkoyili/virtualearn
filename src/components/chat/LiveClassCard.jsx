@@ -1,10 +1,29 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Video, Calendar, Clock, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { db } from '../../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const LiveClassCard = ({ message, isMe, userRole }) => {
   const navigate = useNavigate();
   const { topic, scheduledTime, duration } = message.classDetails || {};
+  const [isLive, setIsLive] = useState(false);
+  
+  useEffect(() => {
+    if (!message.senderId) return;
+    
+    // The room ID is always the teacher's ID. Since teachers create live classes, senderId = roomId.
+    const roomRef = doc(db, 'liveRooms', message.senderId);
+    const unsub = onSnapshot(roomRef, (docSnap) => {
+      if (docSnap.exists() && docSnap.data().isLive) {
+        setIsLive(true);
+      } else {
+        setIsLive(false);
+      }
+    });
+    
+    return () => unsub();
+  }, [message.senderId]);
   
   // Format the date
   const { dateString, timeString } = useMemo(() => {
@@ -22,12 +41,19 @@ const LiveClassCard = ({ message, isMe, userRole }) => {
   return (
     <div className={`mt-1 mb-2 rounded-xl border ${isMe ? 'bg-[#ccebc6] border-[#b0dfa3]' : 'bg-blue-50 border-blue-100'} p-3 sm:p-4 min-w-[250px] shadow-sm`}>
       <div className="flex items-center gap-3 mb-3 pb-3 border-b border-black/10">
-        <div className={`p-2.5 rounded-full ${isMe ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'} shadow-sm`}>
+        <div className={`p-2.5 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : (isMe ? 'bg-green-500' : 'bg-blue-500')} text-white shadow-sm`}>
           <Video size={20} />
         </div>
         <div>
           <h4 className="font-bold text-gray-900 text-sm">{topic || 'Live Class Session'}</h4>
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Scheduled Class</span>
+          {isLive ? (
+            <span className="text-xs font-bold text-red-600 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+              Live Now
+            </span>
+          ) : (
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Scheduled Class</span>
+          )}
         </div>
       </div>
       
@@ -44,9 +70,9 @@ const LiveClassCard = ({ message, isMe, userRole }) => {
       
       <button 
         className={`w-full py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
-          isMe 
-            ? 'bg-green-600 hover:bg-green-700 text-white shadow-md' 
-            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
+          isLive 
+            ? 'bg-red-600 hover:bg-red-700 text-white shadow-md animate-pulse' 
+            : (isMe ? 'bg-green-600 hover:bg-green-700 text-white shadow-md' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md')
         }`}
         onClick={handleJoin}
       >
