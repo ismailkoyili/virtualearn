@@ -5,6 +5,7 @@ import { Eraser, PenTool, Trash2 } from 'lucide-react';
 
 const Whiteboard = ({ roomId, userRole }) => {
   const canvasRef = useRef(null);
+  const strokesRef = useRef([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#000000');
   const [lineWidth, setLineWidth] = useState(3);
@@ -18,20 +19,38 @@ const Whiteboard = ({ roomId, userRole }) => {
 
     const ctx = canvas.getContext('2d');
     
-    // Set internal resolution based on CSS size
     const resizeCanvas = () => {
       const parent = canvas.parentElement;
+      if (!parent || parent.clientWidth === 0 || parent.clientHeight === 0) return;
+      
+      if (canvas.width === parent.clientWidth && canvas.height === parent.clientHeight) return;
+
       canvas.width = parent.clientWidth;
       canvas.height = parent.clientHeight;
-      // We'd ideally redraw all strokes on resize, but for simplicity we'll just clear
+      
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+
+      if (strokesRef.current && strokesRef.current.length > 0) {
+        drawAllStrokes(strokesRef.current);
+      }
     };
+
+    const resizeObserver = new ResizeObserver(() => {
+      resizeCanvas();
+    });
+    
+    if (canvas.parentElement) {
+      resizeObserver.observe(canvas.parentElement);
+    }
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     
-    return () => window.removeEventListener('resize', resizeCanvas);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', resizeCanvas);
+    };
   }, []);
 
   // Listen for remote strokes
@@ -44,8 +63,10 @@ const Whiteboard = ({ roomId, userRole }) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.whiteboardState === 'clear') {
+           strokesRef.current = [];
            clearCanvas(false);
         } else if (data.strokes) {
+           strokesRef.current = data.strokes;
            drawAllStrokes(data.strokes);
         }
       }
@@ -61,6 +82,9 @@ const Whiteboard = ({ roomId, userRole }) => {
     
     // Clear first to redraw
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     
     strokes.forEach(stroke => {
       if (!stroke.points || stroke.points.length === 0) return;
@@ -211,11 +235,13 @@ const Whiteboard = ({ roomId, userRole }) => {
       <div className="flex-1 w-full h-full cursor-crosshair">
         <canvas
           ref={canvasRef}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={endDrawing}
-          onMouseLeave={endDrawing}
+          onPointerDown={startDrawing}
+          onPointerMove={draw}
+          onPointerUp={endDrawing}
+          onPointerOut={endDrawing}
+          onPointerCancel={endDrawing}
           className="w-full h-full block bg-white"
+          style={{ touchAction: 'none' }}
         />
       </div>
     </div>
