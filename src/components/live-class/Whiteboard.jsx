@@ -326,7 +326,7 @@ const Whiteboard = ({ roomId, userRole }) => {
     <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
       {/* Toolbar */}
       {userRole === 'teacher' && (
-        <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur-sm p-2 rounded-xl shadow-md border border-gray-100 flex items-center gap-3">
+        <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-10 bg-white/90 backdrop-blur-sm p-1.5 sm:p-2 rounded-xl shadow-md border border-gray-100 flex flex-wrap items-center gap-1.5 sm:gap-3 max-w-[calc(100%-16px)] sm:max-w-none">
           <button 
             onClick={() => setTool('pen')}
             className={`p-2 rounded-lg transition-colors ${tool === 'pen' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'}`}
