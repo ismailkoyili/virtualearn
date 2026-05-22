@@ -9,7 +9,7 @@ const Whiteboard = ({ roomId, userRole }) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#000000');
   const [lineWidth, setLineWidth] = useState(3);
-  const [currentLine, setCurrentLine] = useState([]);
+  const currentLineRef = useRef([]);
   const [tool, setTool] = useState('pen'); // 'pen' or 'eraser'
 
   // Initialize Canvas
@@ -114,14 +114,22 @@ const Whiteboard = ({ roomId, userRole }) => {
     
     const { x, y } = getCoordinates(e);
     setIsDrawing(true);
-    setCurrentLine([{ x, y }]);
+    currentLineRef.current = [{ x, y }];
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.beginPath();
+    ctx.fillStyle = tool === 'eraser' ? '#ffffff' : color;
+    ctx.arc(x * canvas.width, y * canvas.height, (tool === 'eraser' ? lineWidth * 3 : lineWidth) / 2, 0, Math.PI * 2);
+    ctx.fill();
   };
 
   const draw = (e) => {
     if (!isDrawing || userRole !== 'teacher') return;
     
     const { x, y } = getCoordinates(e);
-    setCurrentLine((prev) => [...prev, { x, y }]);
+    const lastPoint = currentLineRef.current[currentLineRef.current.length - 1];
+    currentLineRef.current.push({ x, y });
     
     // Draw locally immediately
     const canvas = canvasRef.current;
@@ -130,9 +138,10 @@ const Whiteboard = ({ roomId, userRole }) => {
     ctx.beginPath();
     ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : color;
     ctx.lineWidth = tool === 'eraser' ? lineWidth * 3 : lineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     
     // Connect last two points
-    const lastPoint = currentLine[currentLine.length - 1];
     if (lastPoint) {
       ctx.moveTo(lastPoint.x * canvas.width, lastPoint.y * canvas.height);
       ctx.lineTo(x * canvas.width, y * canvas.height);
@@ -144,12 +153,13 @@ const Whiteboard = ({ roomId, userRole }) => {
     if (!isDrawing || userRole !== 'teacher') return;
     setIsDrawing(false);
     
-    if (currentLine.length > 0) {
+    const points = currentLineRef.current;
+    if (points.length > 0) {
       const newStroke = {
         tool,
         color,
         lineWidth,
-        points: currentLine
+        points: [...points]
       };
       
       try {
@@ -168,7 +178,7 @@ const Whiteboard = ({ roomId, userRole }) => {
       }
     }
     
-    setCurrentLine([]);
+    currentLineRef.current = [];
   };
 
   const handleClear = async () => {
