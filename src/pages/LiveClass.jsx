@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { doc, onSnapshot, setDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, getDoc } from 'firebase/firestore';
-import { ArrowLeft, Monitor, PenTool, VideoOff, Video as VideoIcon, Users, Mic, MicOff, PhoneOff, Settings, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Monitor, PenTool, VideoOff, Video as VideoIcon, Users, Mic, MicOff, PhoneOff, Settings, AlertCircle, Smartphone } from 'lucide-react';
 
 // Components
 import Whiteboard from '../components/live-class/Whiteboard';
@@ -36,9 +36,9 @@ const LiveClass = () => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const preJoinVideoRef = useRef(null);
-  const localStream = useRef(null);
   const remoteStream = useRef(null);
   const peerConnection = useRef(null);
+  const liveClassContainerRef = useRef(null);
   
   // Cleanup function for Firestore candidates
   const clearCandidates = async (roomIdToClear) => {
@@ -385,6 +385,32 @@ const LiveClass = () => {
         }
     }
   };
+
+  const toggleScreenRotation = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        if (liveClassContainerRef.current) {
+          await liveClassContainerRef.current.requestFullscreen();
+        } else {
+          await document.documentElement.requestFullscreen();
+        }
+        
+        if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+          try {
+            await window.screen.orientation.lock('landscape');
+          } catch (e) {
+            console.log("Orientation lock not supported or denied.");
+          }
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.error("Fullscreen error:", err);
+    }
+  };
   
   // Clean up on unmount
   useEffect(() => {
@@ -512,7 +538,7 @@ const LiveClass = () => {
 
   // UI: Live Session
   return (
-    <div className="h-screen bg-[#f0f2f5] flex flex-col font-sans overflow-hidden">
+    <div ref={liveClassContainerRef} className="h-screen w-full bg-[#f0f2f5] flex flex-col font-sans overflow-hidden">
       {/* Top Navigation */}
       <nav className="bg-gray-900 px-4 py-3 shadow-lg shrink-0 text-white flex items-center justify-between h-[60px] sm:h-[70px] z-20">
         <div className="flex items-center">
@@ -524,6 +550,16 @@ const LiveClass = () => {
         
         <div className="flex items-center gap-3">
           {/* Audio/Video Controls for ALL users */}
+          <button
+            onClick={toggleScreenRotation}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm bg-gray-700 hover:bg-gray-600 text-white"
+            title="Rotate to Landscape / Fullscreen"
+          >
+            <Smartphone size={18} className="rotate-90 hidden sm:block" />
+            <Smartphone size={18} className="sm:hidden" />
+            <span className="hidden sm:block">Rotate</span>
+          </button>
+
           <button
             onClick={() => setIsMicOn(!isMicOn)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm ${

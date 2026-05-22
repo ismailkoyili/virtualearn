@@ -1,13 +1,15 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { db } from '../../firebase';
 import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { Eraser, PenTool, Trash2, Square, Circle, Minus, Undo2, Redo2 } from 'lucide-react';
+import { Eraser, PenTool, Trash2, Square, Circle, Minus, Undo2, Redo2, Maximize, Minimize } from 'lucide-react';
 
 const Whiteboard = ({ roomId, userRole }) => {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const strokesRef = useRef([]);
   const undoStackRef = useRef([]);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [color, setColor] = useState('#000000');
   const [lineWidth, setLineWidth] = useState(3);
   const currentLineRef = useRef([]);
@@ -17,6 +19,14 @@ const Whiteboard = ({ roomId, userRole }) => {
   useEffect(() => {
     currentPropsRef.current = { tool, color, lineWidth };
   }, [tool, color, lineWidth]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   // Initialize Canvas
   useEffect(() => {
@@ -322,8 +332,20 @@ const Whiteboard = ({ roomId, userRole }) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      if (containerRef.current) {
+        await containerRef.current.requestFullscreen().catch(err => console.error(err));
+      }
+    } else {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen().catch(err => console.error(err));
+      }
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
+    <div ref={containerRef} className="flex flex-col h-full w-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
       {/* Toolbar */}
       {userRole === 'teacher' && (
         <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-10 bg-white/90 backdrop-blur-sm p-1.5 sm:p-2 rounded-xl shadow-md border border-gray-100 flex flex-wrap items-center gap-1.5 sm:gap-3 max-w-[calc(100%-16px)] sm:max-w-none">
@@ -394,6 +416,16 @@ const Whiteboard = ({ roomId, userRole }) => {
             title="Redo"
           >
             <Redo2 size={18} />
+          </button>
+          
+          <div className="h-6 w-px bg-gray-300 mx-1"></div>
+          
+          <button 
+            onClick={toggleFullscreen}
+            className="p-2 rounded-lg transition-colors hover:bg-gray-100 text-gray-600"
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          >
+            {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
           </button>
           
           <div className="h-6 w-px bg-gray-300 mx-1"></div>
