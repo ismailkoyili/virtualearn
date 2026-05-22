@@ -36,6 +36,7 @@ const LiveClass = () => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const preJoinVideoRef = useRef(null);
+  const localStream = useRef(null);
   const remoteStream = useRef(null);
   const peerConnection = useRef(null);
   const liveClassContainerRef = useRef(null);
