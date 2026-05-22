@@ -37,6 +37,7 @@ const LiveClass = () => {
   const remoteVideoRef = useRef(null);
   const preJoinVideoRef = useRef(null);
   const localStream = useRef(null);
+  const remoteStream = useRef(null);
   const peerConnection = useRef(null);
   
   // Cleanup function for Firestore candidates
@@ -170,6 +171,7 @@ const LiveClass = () => {
     // Handle remote tracks
     peerConnection.current.ontrack = (event) => {
       console.log('Received remote track:', event.track.kind);
+      remoteStream.current = event.streams[0];
       if (remoteVideoRef.current) {
         if (remoteVideoRef.current.srcObject !== event.streams[0]) {
           remoteVideoRef.current.srcObject = event.streams[0];
@@ -185,14 +187,21 @@ const LiveClass = () => {
          console.warn("Connection lost");
       }
     };
-    
-    // Ensure local video ref is assigned in the active view
-    setTimeout(() => {
-       if (localVideoRef.current && localStream.current) {
-           localVideoRef.current.srcObject = localStream.current;
-       }
-    }, 500);
   };
+
+  // Reliable media binding to UI
+  useEffect(() => {
+    if (sessionState === 'CONNECTED') {
+      setTimeout(() => {
+        if (localVideoRef.current && localStream.current && localVideoRef.current.srcObject !== localStream.current) {
+            localVideoRef.current.srcObject = localStream.current;
+        }
+        if (remoteVideoRef.current && remoteStream.current && remoteVideoRef.current.srcObject !== remoteStream.current) {
+            remoteVideoRef.current.srcObject = remoteStream.current;
+        }
+      }, 100);
+    }
+  }, [sessionState, activeTab]);
 
   // 4. Start Class (Teacher)
   const startClass = async () => {
@@ -232,24 +241,25 @@ const LiveClass = () => {
         try {
           const rtcSessionDescription = new RTCSessionDescription(data.answer);
           await peerConnection.current.setRemoteDescription(rtcSessionDescription);
+          
+          // Listen for remote ICE candidates strictly AFTER setting remote description
+          onSnapshot(calleeCandidatesCollection, snapshot => {
+            snapshot.docChanges().forEach(async change => {
+              if (change.type === 'added') {
+                let data = change.doc.data();
+                if (peerConnection.current) {
+                   try {
+                      await peerConnection.current.addIceCandidate(new RTCIceCandidate(data));
+                   } catch (e) {}
+                }
+              }
+            });
+          });
+          
         } catch (e) {
           console.error("Error setting remote description:", e);
         }
       }
-    });
-
-    // Listen for remote ICE candidates
-    onSnapshot(calleeCandidatesCollection, snapshot => {
-      snapshot.docChanges().forEach(async change => {
-        if (change.type === 'added') {
-          let data = change.doc.data();
-          if (peerConnection.current && peerConnection.current.remoteDescription) {
-             try {
-                await peerConnection.current.addIceCandidate(new RTCIceCandidate(data));
-             } catch (e) {}
-          }
-        }
-      });
     });
   };
 
