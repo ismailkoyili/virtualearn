@@ -39,6 +39,10 @@ const Whiteboard = ({ roomId, userRole }) => {
         text: textInput.text,
         points: [{ x: textInput.canvasX, y: textInput.canvasY }]
       };
+
+      // Optimistic local update so it shows instantly
+      strokesRef.current = [...strokesRef.current, newStroke];
+      drawAllStrokes(strokesRef.current);
       
       try {
         const whiteboardRef = doc(db, 'liveRooms', roomId);
@@ -257,6 +261,15 @@ const Whiteboard = ({ roomId, userRole }) => {
     const { x, y } = getCoordinates(e);
 
     if (tool === 'text') {
+      if (textInput.visible) {
+        // If an input is already open, clicking on the canvas should just submit the current one.
+        // We return to prevent immediately opening a new text box at the new location.
+        if (textInputRef.current) {
+          textInputRef.current.blur();
+        }
+        return;
+      }
+
       const canvas = canvasRef.current;
       const rect = canvas.getBoundingClientRect();
       setTextInput({
