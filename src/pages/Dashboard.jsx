@@ -4,7 +4,7 @@ import { LogOut, User, CheckCircle, Calendar, Clock, AlertCircle, MessageSquare,
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 
 import AttendanceCalendar from '../components/dashboard/AttendanceCalendar';
 const Dashboard = () => {
@@ -65,6 +65,22 @@ const Dashboard = () => {
     }
   }, [user, navigate, fetchAttendance]);
 
+  const [isLive, setIsLive] = useState(false);
+
+  useEffect(() => {
+    if (user && user.role === 'student' && user.assignedTeacherId) {
+      const roomRef = doc(db, 'liveRooms', user.assignedTeacherId);
+      const unsub = onSnapshot(roomRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setIsLive(!!docSnap.data().isLive);
+        } else {
+          setIsLive(false);
+        }
+      });
+      return () => unsub();
+    }
+  }, [user]);
+
   const markAttendance = async () => {
     if (todayMarked) return;
     setMarkingAttendance(true);
@@ -110,13 +126,19 @@ const Dashboard = () => {
             <span className="font-bold text-xl text-gray-800 ml-2 hidden sm:block">Student Portal</span>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/live-class')}
-              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors px-4 py-2 rounded-full font-medium"
-            >
-              <Video size={18} />
-              <span className="hidden sm:block">Live Class</span>
-            </button>
+            {(!user || user.role !== 'student' || isLive) && (
+              <button
+                onClick={() => navigate('/live-class')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-all ${
+                  isLive 
+                    ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse shadow-md' 
+                    : 'text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                }`}
+              >
+                <Video size={18} />
+                <span className="hidden sm:block">{isLive ? 'Join Live' : 'Live Class'}</span>
+              </button>
+            )}
             <button
               onClick={() => navigate('/chat')}
               className="flex items-center gap-2 text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors px-4 py-2 rounded-full font-medium"
