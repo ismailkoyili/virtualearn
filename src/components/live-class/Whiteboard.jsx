@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { db } from '../../firebase';
 import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { Eraser, PenTool, Trash2, Square, Circle, Minus, Undo2, Redo2, Maximize, Minimize } from 'lucide-react';
+import { Eraser, PenTool, Trash2, Square, Circle, Minus, Undo2, Redo2, Maximize, Minimize, Type } from 'lucide-react';
 
 const Whiteboard = ({ roomId, userRole }) => {
   const canvasRef = useRef(null);
@@ -13,8 +13,54 @@ const Whiteboard = ({ roomId, userRole }) => {
   const [color, setColor] = useState('#000000');
   const [lineWidth, setLineWidth] = useState(3);
   const currentLineRef = useRef([]);
-  const [tool, setTool] = useState('pen'); // 'pen' or 'eraser'
+  const [tool, setTool] = useState('pen'); // 'pen' or 'eraser' or 'text'
   const currentPropsRef = useRef({ tool: 'pen', color: '#000000', lineWidth: 3 });
+
+  const [textInput, setTextInput] = useState({ visible: false, x: 0, y: 0, canvasX: 0, canvasY: 0, text: '' });
+  const textInputRef = useRef(null);
+  const isSubmittingRef = useRef(false);
+
+  useEffect(() => {
+    if (textInput.visible && textInputRef.current) {
+      textInputRef.current.focus();
+    }
+  }, [textInput.visible]);
+
+  const handleTextSubmit = async () => {
+    if (isSubmittingRef.current || !textInput.visible) return;
+    
+    isSubmittingRef.current = true;
+    
+    if (textInput.text.trim()) {
+      const newStroke = {
+        tool: 'text',
+        color,
+        lineWidth,
+        text: textInput.text,
+        points: [{ x: textInput.canvasX, y: textInput.canvasY }]
+      };
+      
+      try {
+        const whiteboardRef = doc(db, 'liveRooms', roomId);
+        await updateDoc(whiteboardRef, {
+          strokes: arrayUnion(newStroke),
+          whiteboardState: 'active'
+        }).catch(async (err) => {
+          if (err.code === 'not-found') {
+            await setDoc(whiteboardRef, { strokes: [newStroke], whiteboardState: 'active' }, { merge: true });
+          }
+        });
+      } catch (error) {
+        console.error("Error syncing text:", error);
+      }
+    }
+    
+    setTextInput(prev => ({ ...prev, visible: false, text: '' }));
+    
+    setTimeout(() => {
+      isSubmittingRef.current = false;
+    }, 100);
+  };
 
   useEffect(() => {
     currentPropsRef.current = { tool, color, lineWidth };
@@ -104,6 +150,14 @@ const Whiteboard = ({ roomId, userRole }) => {
     
     strokes.forEach(stroke => {
       if (!stroke.points || stroke.points.length === 0) return;
+      
+      if (stroke.tool === 'text') {
+        ctx.font = `${stroke.lineWidth * 5 + 10}px Arial`;
+        ctx.fillStyle = stroke.color;
+        ctx.textBaseline = 'top';
+        ctx.fillText(stroke.text, stroke.points[0].x * canvas.width, stroke.points[0].y * canvas.height);
+        return;
+      }
       
       if (['rectangle', 'circle', 'line'].includes(stroke.tool)) {
         if (stroke.points.length < 2) return;
@@ -201,6 +255,21 @@ const Whiteboard = ({ roomId, userRole }) => {
     if (userRole !== 'teacher') return; // Only teacher can draw for now
     
     const { x, y } = getCoordinates(e);
+
+    if (tool === 'text') {
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      setTextInput({
+        visible: true,
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+        canvasX: x,
+        canvasY: y,
+        text: ''
+      });
+      return;
+    }
+
     setIsDrawing(true);
     currentLineRef.current = [{ x, y }];
     
@@ -381,6 +450,14 @@ const Whiteboard = ({ roomId, userRole }) => {
             <Circle size={18} />
           </button>
           
+          <button 
+            onClick={() => setTool('text')}
+            className={`p-2 rounded-lg transition-colors ${tool === 'text' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'}`}
+            title="Text"
+          >
+            <Type size={18} />
+          </button>
+          
           <input 
             type="color" 
             value={color} 
@@ -441,7 +518,7 @@ const Whiteboard = ({ roomId, userRole }) => {
       )}
       
       {/* Canvas */}
-      <div className="flex-1 w-full h-full cursor-crosshair">
+      <div className="flex-1 w-full h-full cursor-crosshair relative">
         <canvas
           ref={canvasRef}
           onPointerDown={startDrawing}
@@ -452,6 +529,34 @@ const Whiteboard = ({ roomId, userRole }) => {
           className="w-full h-full block bg-white"
           style={{ touchAction: 'none' }}
         />
+        {textInput.visible && (
+          <input
+            ref={textInputRef}
+            type="text"
+            value={textInput.text}
+            onChange={(e) => setTextInput({...textInput, text: e.target.value})}
+            onBlur={handleTextSubmit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleTextSubmit();
+            }}
+            style={{
+              position: 'absolute',
+              left: textInput.x,
+              top: textInput.y,
+              color: color,
+              fontSize: `${lineWidth * 5 + 10}px`,
+              fontFamily: 'Arial',
+              background: 'transparent',
+              border: '1px dashed #ccc',
+              outline: 'none',
+              padding: 0,
+              margin: 0,
+              zIndex: 50,
+              minWidth: '100px',
+              lineHeight: 1
+            }}
+          />
+        )}
       </div>
     </div>
   );

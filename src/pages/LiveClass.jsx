@@ -343,9 +343,8 @@ const LiveClass = () => {
     }
   };
 
-  // 7. Screen Share (Teacher)
+  // 7. Screen Share
   const toggleScreenShare = async () => {
-    if (user.role !== 'teacher') return;
     
     if (isScreenSharing) {
         // Stop screen share
@@ -579,21 +578,16 @@ const LiveClass = () => {
             {!isVideoOn ? <VideoOff size={18} /> : <VideoIcon size={18} />}
           </button>
 
-          {/* Teacher Only Controls */}
-          {user.role === 'teacher' && (
-            <>
-              <button
-                onClick={toggleScreenShare}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm ${
-                  isScreenSharing ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                }`}
-                title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}
-              >
-                {isScreenSharing ? <VideoOff size={18} /> : <Monitor size={18} />}
-                <span className="hidden sm:block">{isScreenSharing ? 'Stop Share' : 'Share Screen'}</span>
-              </button>
-            </>
-          )}
+          <button
+            onClick={toggleScreenShare}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm ${
+              isScreenSharing ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+            }`}
+            title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}
+          >
+            {isScreenSharing ? <VideoOff size={18} /> : <Monitor size={18} />}
+            <span className="hidden sm:block">{isScreenSharing ? 'Stop Share' : 'Share Screen'}</span>
+          </button>
 
           <button
             onClick={endClass}
